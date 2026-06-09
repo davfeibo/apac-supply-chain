@@ -258,7 +258,7 @@
                     </button>
                     <button onclick="toggleGlobalStatusFilter('Active')" id="trackBtn-Active" class="p-3 rounded-2xl bg-white/70 hover:bg-white border border-slate-200 flex flex-col items-center justify-center transition-all shadow-sm">
                         <span class="w-2.5 h-2.5 rounded-full bg-orange-500 mb-1.5"></span>
-                        <span class="text-[8px] text-slate-400 font-extrabold uppercase tracking-widest font-sans">Active</span>
+                        <span class="text-[8px] text-slate-400 font-extrabold uppercase tracking-wider font-sans">Active</span>
                         <span id="aggregated-Active" class="text-base font-black text-slate-900 mt-1">0</span>
                     </button>
                     <button onclick="toggleGlobalStatusFilter('Delayed')" id="trackBtn-Delayed" class="p-3 rounded-2xl bg-white/70 hover:bg-white border border-slate-200 flex flex-col items-center justify-center transition-all shadow-sm">
@@ -440,7 +440,7 @@
                                 
                                 <div id="titleContainerView">
                                     <h2 id="detailTitle" class="text-sm font-extrabold leading-snug text-slate-900 font-sans"></h2>
-                                end
+                                </div>
                                 <div id="titleContainerEdit" class="hidden">
                                     <input type="text" id="editTitleInput" oninput="handleTitleEdit(this.value)" class="w-full text-xs font-extrabold leading-snug text-slate-900 bg-white border border-slate-200 rounded-xl px-2.5 py-2 focus:ring-2 focus:ring-black outline-none font-sans">
                                 </div>
@@ -800,7 +800,7 @@
         // ==========================================================
         // 🟢 自动填充：已从你的截屏中识别并填入真实的 Firebase 凭证 🟢
         // ==========================================================
-        const YOUR_FIREBASE_CONFIG = {
+        const firebaseConfig = {
             apiKey: "AIzaSyA_TeFy-NJ00pKWrcT1KSTDevzMK2av2s",
             authDomain: "apac-supply-chain.firebaseapp.com",
             projectId: "apac-supply-chain",
@@ -809,37 +809,17 @@
             appId: "1:604713968594:web:155a13d1a35ae553c75e0b",
             measurementId: "G-F550YB8F29"
         };
-        // ==========================================================
-
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        let firebaseConfig = null;
-        let isFirebaseEnabled = false;
-
-        // 优先应用直接填写的配置
-        if (YOUR_FIREBASE_CONFIG && YOUR_FIREBASE_CONFIG.apiKey && YOUR_FIREBASE_CONFIG.apiKey !== "YOUR_API_KEY") {
-            firebaseConfig = YOUR_FIREBASE_CONFIG;
-            isFirebaseEnabled = true;
-        } else {
-            try {
-                if (typeof __firebase_config !== 'undefined' && __firebase_config) {
-                    firebaseConfig = JSON.parse(__firebase_config);
-                    isFirebaseEnabled = true;
-                }
-            } catch (e) {
-                console.error("Firebase config environment variable is missing or malformed:", e);
-            }
-        }
+        const appId = 'apac-supply-chain-app'; 
+        let isFirebaseEnabled = true;
 
         let app, auth, db;
-        if (isFirebaseEnabled && firebaseConfig) {
-            try {
-                app = initializeApp(firebaseConfig);
-                auth = getAuth(app);
-                db = getFirestore(app);
-            } catch (e) {
-                console.error("Failed to connect to Firebase cloud services. Falling back to local offline mode.", e);
-                isFirebaseEnabled = false;
-            }
+        try {
+            app = initializeApp(firebaseConfig);
+            auth = getAuth(app);
+            db = getFirestore(app);
+        } catch (e) {
+            console.error("Failed to connect to Firebase cloud services. Falling back to local offline mode.", e);
+            isFirebaseEnabled = false;
         }
 
         const WORKSPACE_CACHE_KEY = 'apac_supply_chain_hub_workspaces_v1';
