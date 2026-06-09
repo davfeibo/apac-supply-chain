@@ -529,7 +529,7 @@
                                     <div>
                                         <label class="block text-[9px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 font-sans" id="lblRelatedProjects">Cross-Workspace Dependencies</label>
                                         <div id="relatedProjectsContainer" class="flex flex-wrap gap-1.5 mb-1.5"></div>
-                                        <div id="relatedProjectsInputGroup" class="hidden space-y-2 bg-slate-50/50 p-2.5 rounded-xl border border-slate-200/60 shadow-inner font-sans">
+                                        <div id="relatedProjectsInputGroup" class="hidden space-y-2 bg-slate-50/50 p-2.5 rounded-xl border border-slate-200/60 shadow-inner">
                                             <label class="block text-[8px] font-black uppercase tracking-wider text-slate-400 font-sans">Step 1: Select Target Workspace</label>
                                             <select id="selectWorkspaceForRelated" onchange="handleWorkspaceForRelatedChange(this.value)" class="w-full text-xs bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 outline-none focus:ring-2 focus:ring-black font-sans font-bold"></select>
                                             
@@ -811,6 +811,7 @@
         };
         const appId = 'apac-supply-chain-app'; 
         let isFirebaseEnabled = true;
+        let firebaseError = null;
 
         let app, auth, db;
         try {
@@ -820,6 +821,7 @@
         } catch (e) {
             console.error("Failed to connect to Firebase cloud services. Falling back to local offline mode.", e);
             isFirebaseEnabled = false;
+            firebaseError = e;
         }
 
         const WORKSPACE_CACHE_KEY = 'apac_supply_chain_hub_workspaces_v1';
@@ -900,23 +902,30 @@
             } catch (e) {
                 console.error("Firebase authentication process failed. Defaulting to local preview mode.", e);
                 isFirebaseEnabled = false;
+                firebaseError = e;
                 currentUser = { uid: 'local-session-user' };
                 startLocalOfflineSync(e);
             }
         };
 
+        // 强健的身份与会话初始化核心
         if (isFirebaseEnabled && auth) {
             onAuthStateChanged(auth, async (user) => {
-                if (!user) return;
-                currentUser = user;
-                
-                const sessionName = sessionStorage.getItem('collaborator_name');
-                if (sessionName) {
-                    currentUserName = sessionName;
-                    document.getElementById('loginOverlay').style.display = 'none';
-                    startRealtimeSync();
+                if (user) {
+                    currentUser = user;
+                    console.log("Firebase Auth Success! UID:", user.uid);
+                    
+                    const sessionName = sessionStorage.getItem('collaborator_name');
+                    if (sessionName) {
+                        currentUserName = sessionName;
+                        document.getElementById('loginOverlay').style.display = 'none';
+                        startRealtimeSync();
+                    } else {
+                        document.getElementById('loginOverlay').style.display = 'flex';
+                    }
                 } else {
-                    document.getElementById('loginOverlay').style.display = 'flex';
+                    // 若无账户，触发初始化
+                    initAuth();
                 }
             });
         } else {
@@ -925,7 +934,7 @@
                 currentUserName = sessionName;
                 document.getElementById('loginOverlay').style.display = 'none';
                 setTimeout(() => {
-                    startLocalOfflineSync();
+                    startLocalOfflineSync(firebaseError);
                 }, 100);
             } else {
                 document.getElementById('loginOverlay').style.display = 'flex';
@@ -945,7 +954,12 @@
             if (isFirebaseEnabled && currentUser && currentUser.uid !== 'local-session-user') {
                 startRealtimeSync();
             } else {
-                startLocalOfflineSync();
+                if (!isFirebaseEnabled) {
+                    startLocalOfflineSync(firebaseError);
+                } else {
+                    // 载入中提示，消除竞态延迟
+                    document.getElementById('activeCollaboratorsList').innerHTML = `${currentUserName} <span class="text-amber-500 font-extrabold ml-1.5">(Connecting to Cloud... 🟡)</span>`;
+                }
             }
         };
 
@@ -996,9 +1010,9 @@
         function startLocalOfflineSync(err = null) {
             let statusHtml = `${currentUserName} (You - Local Preview)`;
             if (err) {
-                statusHtml += ` <span class="text-rose-500 font-extrabold ml-1.5" title="${escapeHtml(err.message)}">(⚠️ Cloud Connection Error: ${escapeHtml(err.code || 'unknown')})</span>`;
+                statusHtml += ` <span class="text-rose-500 font-extrabold ml-1.5" title="${escapeHtml(err.message || err)}">(⚠️ Cloud Connection Error: ${escapeHtml(err.code || err.message || 'unknown')})</span>`;
                 setTimeout(() => {
-                    showToast(`Cloud connection aborted: ${err.code || err.message}`);
+                    showToast(`Cloud connection aborted: ${err.code || err.message || 'Error'}`);
                 }, 1000);
             }
             document.getElementById('activeCollaboratorsList').innerHTML = statusHtml;
@@ -2516,7 +2530,7 @@
             document.getElementById('timelineContainerView').innerText = proj.timeline;
             const editTimeSel = document.getElementById('editTimeline');
             editTimeSel.innerHTML = '';
-            ws.telines = ws.timelines || [];
+            ws.timelines = ws.timelines || [];
             ws.timelines.forEach(time => {
                 const opt = document.createElement('option');
                 opt.value = time;
@@ -3474,7 +3488,7 @@
                         ws.projects = ws.projects.filter(p => p.id !== selectedProjectId);
                         saveLocalState();
                     }
-                    await pushActivityLog(`Permanently deleted project scheduled card: [${proj.title}]`);
+                    await pushActivityLog("Permanently deleted project scheduled card: [" + proj.title + "]");
 
                     closeDetails();
                     updateGlobalStats();
