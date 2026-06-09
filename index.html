@@ -258,7 +258,7 @@
                     </button>
                     <button onclick="toggleGlobalStatusFilter('Active')" id="trackBtn-Active" class="p-3 rounded-2xl bg-white/70 hover:bg-white border border-slate-200 flex flex-col items-center justify-center transition-all shadow-sm">
                         <span class="w-2.5 h-2.5 rounded-full bg-orange-500 mb-1.5"></span>
-                        <span class="text-[8px] text-slate-400 font-extrabold uppercase tracking-wider font-sans">Active</span>
+                        <span class="text-[8px] text-slate-400 font-extrabold uppercase tracking-widest font-sans">Active</span>
                         <span id="aggregated-Active" class="text-base font-black text-slate-900 mt-1">0</span>
                     </button>
                     <button onclick="toggleGlobalStatusFilter('Delayed')" id="trackBtn-Delayed" class="p-3 rounded-2xl bg-white/70 hover:bg-white border border-slate-200 flex flex-col items-center justify-center transition-all shadow-sm">
@@ -529,7 +529,7 @@
                                     <div>
                                         <label class="block text-[9px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 font-sans" id="lblRelatedProjects">Cross-Workspace Dependencies</label>
                                         <div id="relatedProjectsContainer" class="flex flex-wrap gap-1.5 mb-1.5"></div>
-                                        <div id="relatedProjectsInputGroup" class="hidden space-y-2 bg-slate-50/50 p-2.5 rounded-xl border border-slate-200/60 shadow-inner">
+                                        <div id="relatedProjectsInputGroup" class="hidden space-y-2 bg-slate-50/50 p-2.5 rounded-xl border border-slate-200/60 shadow-inner font-sans">
                                             <label class="block text-[8px] font-black uppercase tracking-wider text-slate-400 font-sans">Step 1: Select Target Workspace</label>
                                             <select id="selectWorkspaceForRelated" onchange="handleWorkspaceForRelatedChange(this.value)" class="w-full text-xs bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 outline-none focus:ring-2 focus:ring-black font-sans font-bold"></select>
                                             
@@ -901,6 +901,7 @@
                 console.error("Firebase authentication process failed. Defaulting to local preview mode.", e);
                 isFirebaseEnabled = false;
                 currentUser = { uid: 'local-session-user' };
+                startLocalOfflineSync(e);
             }
         };
 
@@ -992,8 +993,15 @@
             }, (error) => console.error("Workspace configuration sync error: ", error));
         }
 
-        function startLocalOfflineSync() {
-            document.getElementById('activeCollaboratorsList').innerText = `${currentUserName} (You - Local Preview)`;
+        function startLocalOfflineSync(err = null) {
+            let statusHtml = `${currentUserName} (You - Local Preview)`;
+            if (err) {
+                statusHtml += ` <span class="text-rose-500 font-extrabold ml-1.5" title="${escapeHtml(err.message)}">(⚠️ Cloud Connection Error: ${escapeHtml(err.code || 'unknown')})</span>`;
+                setTimeout(() => {
+                    showToast(`Cloud connection aborted: ${err.code || err.message}`);
+                }, 1000);
+            }
+            document.getElementById('activeCollaboratorsList').innerHTML = statusHtml;
 
             const cache = sessionStorage.getItem(WORKSPACE_CACHE_KEY) || localStorage.getItem(WORKSPACE_CACHE_KEY);
             if (cache) {
@@ -1397,7 +1405,7 @@
                         <div class="grid grid-cols-6 gap-1 text-center text-[8px] font-bold font-sans">
                             <div class="bg-slate-100/50 p-1.5 rounded-xl border border-slate-200/40">
                                 <div class="text-slate-800 font-black text-[10px]">${total}</div>
-                                <div class="text-slate-400 text-[6.5px] uppercase mt-0.5">Tasks</div>
+                                <div class="text-slate-400 text-[6.5px] uppercase mt-0.5 font-sans">Tasks</div>
                             </div>
                             <div class="bg-emerald-50 p-1.5 rounded-xl border border-emerald-100">
                                 <div class="text-emerald-700 font-black text-[10px]">${nailed}</div>
@@ -3886,7 +3894,7 @@
             );
         }
 
-        window.onload = function () {
+        function initApp() {
             initAuth().then(() => {
                 setupSearchInput();
                 updateUndoRedoControls();
@@ -3896,6 +3904,13 @@
                 setupSearchInput();
                 updateUndoRedoControls();
             });
+        }
+
+        // 健壮的DOMContentLoaded及readyState检查
+        if (document.readyState === 'complete' || document.readyState === 'interactive') {
+            initApp();
+        } else {
+            window.addEventListener('DOMContentLoaded', initApp);
         }
     </script>
 </body>
