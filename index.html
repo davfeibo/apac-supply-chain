@@ -801,7 +801,7 @@
         // 🟢 自动填充：已从你的截屏中识别并填入真实的 Firebase 凭证 🟢
         // ==========================================================
         const firebaseConfig = {
-            apiKey: "AIzaSyA_TeFy-NJ00pKWrcT1KSTDevzMK2av2s",
+            apiKey: "AIzaSyA_TeFy-NJ00pKWrct1KSTDvezMK2av2s",
             authDomain: "apac-supply-chain.firebaseapp.com",
             projectId: "apac-supply-chain",
             storageBucket: "apac-supply-chain.firebasestorage.app",
@@ -908,13 +908,10 @@
             }
         };
 
-        // 强健的身份与会话初始化核心
         if (isFirebaseEnabled && auth) {
             onAuthStateChanged(auth, async (user) => {
                 if (user) {
                     currentUser = user;
-                    console.log("Firebase Auth Success! UID:", user.uid);
-                    
                     const sessionName = sessionStorage.getItem('collaborator_name');
                     if (sessionName) {
                         currentUserName = sessionName;
@@ -924,7 +921,6 @@
                         document.getElementById('loginOverlay').style.display = 'flex';
                     }
                 } else {
-                    // 若无账户，触发初始化
                     initAuth();
                 }
             });
@@ -957,7 +953,6 @@
                 if (!isFirebaseEnabled) {
                     startLocalOfflineSync(firebaseError);
                 } else {
-                    // 载入中提示，消除竞态延迟
                     document.getElementById('activeCollaboratorsList').innerHTML = `${currentUserName} <span class="text-amber-500 font-extrabold ml-1.5">(Connecting to Cloud... 🟡)</span>`;
                 }
             }
@@ -3488,7 +3483,7 @@
                         ws.projects = ws.projects.filter(p => p.id !== selectedProjectId);
                         saveLocalState();
                     }
-                    await pushActivityLog("Permanently deleted project scheduled card: [" + proj.title + "]");
+                    await pushActivityLog(`Permanently deleted project scheduled card: [${proj.title}]`);
 
                     closeDetails();
                     updateGlobalStats();
