@@ -153,6 +153,14 @@
         .pulse-accent {
             animation: pulse-ring 2s infinite ease-in-out;
         }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(4px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fade-in {
+            animation: fadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
     </style>
 </head>
 <body class="text-slate-900 min-h-screen flex flex-col antialiased xl:h-screen xl:overflow-hidden selection:bg-black selection:text-white relative">
@@ -167,7 +175,7 @@
             <p class="text-xs text-slate-500 mb-6 leading-relaxed font-sans px-4">To ensure real-time collaboration updates, audit tracking, and history tracing, please enter your full name before entering the workspace.</p>
             
             <div class="w-full bg-slate-100 p-1.5 rounded-2xl border border-slate-200/60 mb-5">
-                <input type="text" id="userInputName" placeholder="e.g., David Zhang / Keira Thorne" class="w-full text-center text-sm bg-transparent outline-none py-2.5 font-bold text-slate-800">
+                <input type="text" id="userInputName" onkeydown="handleLoginKeyDown(event)" placeholder="e.g., David Zhang / Keira Thorne" class="w-full text-center text-sm bg-transparent outline-none py-2.5 font-bold text-slate-800">
             </div>
 
             <button onclick="submitUserLogin()" class="w-full bg-black hover:bg-slate-800 text-white py-3.5 rounded-2xl text-xs font-bold tracking-widest uppercase transition-all shadow-md">
@@ -212,7 +220,7 @@
                     <h1 class="text-xl md:text-2xl font-extrabold tracking-tight text-slate-900 leading-none">APAC Supply Chain Project Management Hub</h1>
                     <p class="text-[11px] text-slate-500 font-bold tracking-wider uppercase mt-2.5 leading-none">Collaborative Operations & Scheduling Desk</p>
                     
-                    <div class="flex items-center gap-2 mt-4 flex-wrap bg-white/50 px-3.5 py-2 rounded-2xl border border-slate-200/50 max-w-xl">
+                    <div class="flex items-center gap-2 mt-4 flex-wrap bg-white/50 px-3.5 py-2 rounded-2xl border border-slate-200/50 max-w-xl shadow-inner">
                         <span class="flex h-2 w-2 relative">
                             <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                             <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
@@ -388,7 +396,7 @@
             
             <section id="timelineSection" class="w-full h-full flex flex-col gap-4 xl:overflow-y-auto scrollbar-thin pr-1 pb-4">
                 
-                <div id="lblInstructions" contenteditable="true" onblur="handleHeaderEdit('instructions', this.innerText)" class="text-[10px] text-slate-500 font-bold bg-white/40 border border-white/50 px-4 py-2.5 rounded-2xl leading-snug text-left select-none shadow-sm transition-all font-sans">
+                <div id="lblInstructions" contenteditable="true" onblur="handleHeaderEdit('instructions', this.innerText)" class="text-[10px] text-slate-500 font-bold bg-white/40 border border-white/50 px-4 py-2.5 rounded-2xl leading-snug text-left select-none shadow-sm transition-all font-sans animate-fade-in">
                     Double-click any empty grid cell to quickly schedule a task! Double-click any Quarter header to rename or delete columns. Drag cards, headers, or lanes to customize your schedule layout.
                 </div>
 
@@ -556,7 +564,7 @@
 
                                 <!-- Comprehensive Description View -->
                                 <div class="p-5 text-slate-600 space-y-4 text-xs leading-relaxed" id="detailBodyContainer">
-                                    <div id="descViewBlock" class="space-y-3 font-sans"></div>
+                                    <div id="descViewBlock" class="space-y-3 font-sans font-semibold"></div>
                                     <div id="descEditBlock" class="hidden space-y-3">
                                         <label class="block text-[9px] font-bold uppercase tracking-wider text-slate-400 font-sans" id="lblProjectDescTitle">Project Description</label>
                                         <textarea id="editDescTextarea" oninput="handleDescEdit(this.value)" rows="10" class="w-full text-xs font-medium text-slate-800 bg-white border border-slate-200 rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-black outline-none font-sans leading-relaxed" placeholder="Type comprehensive project background, targets, and scope..."></textarea>
@@ -632,7 +640,7 @@
                                 </div>
 
                                 <div class="p-5 text-slate-600 space-y-4 text-xs leading-relaxed">
-                                    <div id="subDescViewBlock" class="space-y-3 font-sans"></div>
+                                    <div id="subDescViewBlock" class="space-y-3 font-sans font-semibold"></div>
                                     <div id="subDescEditBlock" class="hidden space-y-3">
                                         <label class="block text-[9px] font-bold uppercase tracking-wider text-slate-400 font-sans">Subproject Description</label>
                                         <textarea id="subEditDescTextarea" oninput="handleSubDescEdit(this.value)" rows="10" class="w-full text-xs font-medium text-slate-800 bg-white border border-slate-200 rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-black outline-none font-sans leading-relaxed" placeholder="Type subproject specifications or requirements..."></textarea>
@@ -668,7 +676,7 @@
             <button onclick="toggleActivityDrawer()" class="p-2 hover:bg-slate-200/60 text-slate-500 hover:text-black rounded-xl transition-colors">✕</button>
         </div>
         <div id="collaboratorLiveLogs" class="flex-1 overflow-y-auto p-5 space-y-3.5 scrollbar-thin bg-transparent">
-            <div class="p-4 text-center text-slate-400 text-xs italic font-sans">
+            <div class="p-4 text-center text-slate-400 text-xs italic font-sans font-medium">
                 Connecting to cloud live streams...
             </div>
         </div>
@@ -794,20 +802,22 @@
     <!-- ========================================================== -->
     <script>
         // ==========================================================
-        // 🟢 已全面集成 jsonbin.io 凭证进行云端实时共享同步 🟢
+        // 🟢 云端同步及防抖非阻塞更新模块 🟢
         // ==========================================================
         const BIN_ID = '6a29021cda38895dfea4bd46';
         const API_KEY = '$2a$10$WGhPi0brl8xm2YAvlNsOFu08MuDQDbZFJ3gy7wgH1Q0fhUozxieLy';
         const API_URL = `https://api.jsonbin.io/v3/b/${BIN_ID}`;
 
-        let isFirebaseEnabled = true; // 保留原变量名确保全局兼容性
+        let isFirebaseEnabled = true; 
         let firebaseError = null;
         let isSyncing = false;
+        let isSyncPending = false; // 标识是否有尚未提交到云端的本地更改
+        let syncTimeout = null; // 防抖句柄
 
         const WORKSPACE_CACHE_KEY = 'apac_supply_chain_hub_workspaces_v1';
         
         let workspaces = [];
-        let activityLogs = []; // 云端全局活动日志
+        let activityLogs = []; 
         let activeWorkspaceId = null;
         let activeGlobalFilterStatus = null; 
 
@@ -870,12 +880,18 @@
         }
 
         const initAuth = async () => {
-            // jsonbin.io 时代无感静默认证
             currentUser = { uid: 'jsonbin-authorized-user' };
             return;
         };
 
-        // 处理登录验证与实时共享
+        // 处理回车直接登录
+        window.handleLoginKeyDown = function(event) {
+            if (event.key === 'Enter') {
+                submitUserLogin();
+            }
+        }
+
+        // 处理登录验证与乐观 UI 加载 (0ms Entry)
         window.submitUserLogin = async function() {
             const nameInput = document.getElementById('userInputName').value.trim();
             if (!nameInput) {
@@ -884,15 +900,44 @@
             }
             currentUserName = nameInput;
             sessionStorage.setItem('collaborator_name', nameInput);
+            
+            // 乐观渲染首屏：立刻隐藏登录遮罩，避免等待云接口卡顿
             document.getElementById('loginOverlay').style.display = 'none';
             
+            // 立即加载本地缓存并呈现
+            loadFromLocalStorageOrSeed();
+            if (activeWorkspaceId) {
+                applyActiveWorkspaceToUI();
+            } else {
+                renderHubView();
+            }
+            updateGlobalStats();
+            
+            // 后台静默启动云同步，即使网络断开也毫不影响本地使用！
             startRealtimeSync();
         };
 
-        // 核心云存储上传 (PUT 方法)
-        async function pushToCloud() {
-            if (isSyncing) return;
+        // 统一前台触发：立即更新本地存储与乐观 UI，防抖静默同步到云端
+        function triggerBackgroundSync() {
+            saveLocalState();
+            isSyncPending = true;
+            updateSyncStatusIndicator('saving');
+            
+            if (syncTimeout) clearTimeout(syncTimeout);
+            syncTimeout = setTimeout(async () => {
+                await pushToCloudBackground();
+            }, 800); // 800ms 防抖同步触发队列
+        }
+
+        // 核心非阻塞后台云同步引擎 (PUT)
+        async function pushToCloudBackground() {
+            if (isSyncing) {
+                if (syncTimeout) clearTimeout(syncTimeout);
+                syncTimeout = setTimeout(pushToCloudBackground, 300);
+                return;
+            }
             isSyncing = true;
+            updateSyncStatusIndicator('saving');
             try {
                 const payload = {
                     workspaces: workspaces,
@@ -909,18 +954,72 @@
                 });
                 if (!response.ok) throw new Error(`HTTP ${response.status}`);
                 saveLocalState();
-                showToast("云端同步保存成功！🟢");
+                isSyncPending = false;
+                updateSyncStatusIndicator('online');
             } catch (e) {
                 console.error("Failed to push to jsonbin.io:", e);
-                showToast("云端同步失败，请检查网络 ⚠️");
+                updateSyncStatusIndicator('error');
             } finally {
                 isSyncing = false;
+            }
+        }
+
+        // 手动错误重试
+        window.retryCloudSync = async function() {
+            showToast("正在重新同步更改到云端... 🔄");
+            await pushToCloudBackground();
+        }
+
+        // 更新状态指示灯（无感静默，替换嘈杂的 Toast，极具 Figma 质感）
+        function updateSyncStatusIndicator(status) {
+            const el = document.getElementById('activeCollaboratorsList');
+            if (!el) return;
+            let statusHtml = '';
+            if (status === 'saving') {
+                statusHtml = `<span class="flex items-center gap-1.5 text-amber-600 font-extrabold cursor-pointer select-none transition-all duration-300" title="正在静默保存更新到云端..."><span class="inline-block w-2 h-2 rounded-full bg-amber-500 animate-ping"></span>${escapeHtml(currentUserName)} (Saving... 💾)</span>`;
+            } else if (status === 'online') {
+                statusHtml = `<span class="flex items-center gap-1.5 text-emerald-600 font-extrabold cursor-pointer select-none transition-all duration-300" title="云端共享就绪！已完美同步最新数据。"><span class="inline-block w-2 h-2 rounded-full bg-emerald-500"></span>${escapeHtml(currentUserName)} (Cloud Online 🟢)</span>`;
+            } else if (status === 'local') {
+                statusHtml = `<span class="flex items-center gap-1.5 text-blue-600 font-extrabold cursor-pointer select-none transition-all duration-300" title="本地预览模式！数据保存在浏览器中。"><span class="inline-block w-2 h-2 rounded-full bg-blue-500"></span>${escapeHtml(currentUserName)} (Local Sandbox 💻)</span>`;
+            } else if (status === 'error') {
+                statusHtml = `<span class="flex items-center gap-1.5 text-rose-600 font-extrabold cursor-pointer select-none animate-bounce" onclick="retryCloudSync()" title="同步遇到了网络波动。点击此处立即手动重试！"><span class="inline-block w-2 h-2 rounded-full bg-rose-500 animate-pulse"></span>${escapeHtml(currentUserName)} (Sync Error ⚠️ Click to Retry)</span>`;
+            } else {
+                statusHtml = `<span class="flex items-center gap-1.5 text-emerald-600 font-extrabold"><span class="inline-block w-2 h-2 rounded-full bg-emerald-500"></span>${escapeHtml(currentUserName)} (Cloud Online 🟢)</span>`;
+            }
+            el.innerHTML = statusHtml;
+        }
+
+        // 核心本地存储加载器（若云拉取慢或断网，优先呈现，确保系统 100% 可用）
+        function loadFromLocalStorageOrSeed() {
+            const cached = localStorage.getItem(WORKSPACE_CACHE_KEY) || sessionStorage.getItem(WORKSPACE_CACHE_KEY);
+            if (cached) {
+                try {
+                    workspaces = JSON.parse(cached);
+                    // 修正旧格式数据
+                    workspaces.forEach(ws => {
+                        if (ws.projects) {
+                            ws.projects.forEach(p => {
+                                if (p.status === 'On Going' || p.status === 'ongoing' || p.status === 'Ongoing' || p.status === 'On-going') {
+                                    p.status = 'Active';
+                                }
+                            });
+                        }
+                    });
+                } catch(e) {
+                    seedInitialLocalData();
+                }
+            } else {
+                seedInitialLocalData();
             }
         }
 
         // 核心云存储下载拉取 (GET 方法)
         async function pullFromCloud(isSilent = false) {
             if (isSyncing) return;
+            // 轮询安全锁：若处于“编辑模式”、有待同步的更改、正在拖拽或选择卡片中，暂缓轮询，防止冲掉前台输入
+            if (isSilent && (isEditModeActive || isSyncPending || draggedCardId || draggedQuarter || draggedTower || selectedProjectId)) {
+                return;
+            }
             isSyncing = true;
             if (!isSilent) {
                 showToast("正在从云端拉取最新数据... 📥");
@@ -940,7 +1039,7 @@
                     activityLogs = data.activityLogs || [];
                     saveLocalState();
 
-                    // 对旧状态下的 ongoing 项目字段进行自动校正
+                    // 自动修剪、校正残存的旧状态名称
                     workspaces.forEach(ws => {
                         if (ws.projects) {
                             ws.projects.forEach(p => {
@@ -958,10 +1057,10 @@
                     }
                     updateGlobalStats();
                     renderActivityLogs(activityLogs.slice(0, 15));
+                    updateSyncStatusIndicator('online');
                     if (!isSilent) showToast("已成功同步最新的云端数据！🟢");
                 } else {
-                    // 空 Bin 自愈初始化逻辑
-                    if (!isSilent) showToast("检测到云端为空，正在初始化默认工作区... ⚙️");
+                    if (!isSilent) showToast("同步初始化... ⚙️");
                     seedInitialLocalData();
                     activityLogs = [{
                         user: 'System Initializer',
@@ -969,23 +1068,24 @@
                         timestamp: Date.now()
                     }];
                     isSyncing = false;
-                    await pushToCloud();
+                    await pushToCloudBackground();
                 }
             } catch (e) {
                 console.error("Failed to pull:", e);
-                if (!isSilent) showToast(`云拉取失败: ${e.message} ⚠️`);
+                if (!isSilent) {
+                    showToast(`同步模式受限，已切换为本地沙盒模式 💻`);
+                    updateSyncStatusIndicator('local');
+                }
             } finally {
                 isSyncing = false;
             }
         }
 
         async function startRealtimeSync() {
-            document.getElementById('activeCollaboratorsList').innerHTML = `${currentUserName} <span class="text-emerald-500 font-extrabold ml-1.5">(Cloud Online 🟢)</span>`;
-            
-            // 首次全量抓取
-            await pullFromCloud(false);
+            // 首次后台拉取
+            await pullFromCloud(true);
 
-            // 每15秒轮询，实现无延迟多浏览器/多团队联动共享
+            // 每15秒轮询
             setInterval(() => {
                 pullFromCloud(true);
             }, 15000);
@@ -1004,7 +1104,7 @@
             logs.forEach(log => {
                 const timeStr = new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                 const item = document.createElement('div');
-                item.className = "p-3 rounded-2xl bg-slate-50 border border-slate-200/50 text-[10px] space-y-1 hover:bg-slate-100/50 transition-all shadow-sm";
+                item.className = "p-3 rounded-2xl bg-slate-50 border border-slate-200/50 text-[10px] space-y-1 hover:bg-slate-100/50 transition-all shadow-sm animate-fade-in";
                 item.innerHTML = `
                     <div class="flex items-center justify-between font-bold text-slate-400 text-[8px] font-sans">
                         <span class="text-slate-700">👤 ${escapeHtml(log.user)}</span>
@@ -1016,8 +1116,8 @@
             });
         }
 
-        // 云端发布操作日志
-        async function pushActivityLog(actionText) {
+        // 异步云日志上报
+        function pushActivityLog(actionText) {
             if (!currentUserName) return;
             
             const newLog = {
@@ -1027,12 +1127,12 @@
             };
             
             activityLogs.unshift(newLog);
-            if (activityLogs.length > 50) activityLogs = activityLogs.slice(0, 50); // 限制50条
+            if (activityLogs.length > 50) activityLogs = activityLogs.slice(0, 50); 
             
             renderActivityLogs(activityLogs.slice(0, 15));
             
             if (isFirebaseEnabled) {
-                await pushToCloud();
+                triggerBackgroundSync();
             } else {
                 sessionStorage.setItem('mock_activity_log', JSON.stringify(activityLogs));
             }
@@ -1118,9 +1218,9 @@
             ];
         }
 
-        async function updateWorkspaceMetaCloud() {
+        function updateWorkspaceMetaCloud() {
             if (isFirebaseEnabled) {
-                await pushToCloud();
+                triggerBackgroundSync();
             } else {
                 saveLocalState();
             }
@@ -1176,15 +1276,8 @@
                             }
                         });
 
-                        if (isFirebaseEnabled) {
-                            workspaces = importedWorkspaces;
-                            await pushToCloud();
-                        } else {
-                            workspaces = importedWorkspaces;
-                            saveLocalState();
-                            renderHubView();
-                            updateGlobalStats();
-                        }
+                        workspaces = importedWorkspaces;
+                        saveLocalState();
                         
                         if (activeWorkspaceId) {
                             applyActiveWorkspaceToUI();
@@ -1192,7 +1285,12 @@
                             renderHubView();
                         }
                         updateGlobalStats();
-                        await pushActivityLog(`Imported and restored backup from local file`);
+
+                        if (isFirebaseEnabled) {
+                            triggerBackgroundSync();
+                        }
+                        
+                        pushActivityLog(`Imported and restored backup from local file`);
                         showToast("Backup restored successfully!");
                     } else {
                         showToast("Invalid backup file structure.");
@@ -1326,7 +1424,7 @@
             activeWsIdForSettings = null;
         }
 
-        window.saveWorkspaceSettings = async function() {
+        window.saveWorkspaceSettings = function() {
             if (!activeWsIdForSettings) return;
             const ws = workspaces.find(w => w.id === activeWsIdForSettings);
             if (!ws) return;
@@ -1344,8 +1442,8 @@
             ws.name = nameInput;
             ws.subtitle = subtitleInput;
             
-            await updateWorkspaceMetaCloud();
-            await pushActivityLog(`Updated workspace [${oldName}] properties to [${nameInput}]`);
+            updateWorkspaceMetaCloud();
+            pushActivityLog(`Updated workspace [${oldName}] properties to [${nameInput}]`);
             closeWorkspaceSettingsModal();
             showToast("Workspace updated successfully!");
             
@@ -1366,12 +1464,12 @@
             requestCustomConfirmation(
                 "Delete Workspace?",
                 `Are you sure you want to delete "${ws.name}"? This will permanently delete all projects and cannot be undone!`,
-                async () => {
+                () => {
                     saveGlobalSnapshot();
                     
                     workspaces = workspaces.filter(w => w.id !== id);
-                    await updateWorkspaceMetaCloud();
-                    await pushActivityLog(`Deleted workspace [${ws.name}] and all associated project schedules.`);
+                    updateWorkspaceMetaCloud();
+                    pushActivityLog(`Deleted workspace [${ws.name}] and all associated project schedules.`);
                     
                     renderHubView();
                     updateGlobalStats();
@@ -1439,7 +1537,7 @@
             renderMatrices();
         }
 
-        window.handleHeaderEdit = async function(field, text) {
+        window.handleHeaderEdit = function(field, text) {
             const ws = workspaces.find(w => w.id === activeWorkspaceId);
             if (!ws) return;
             saveGlobalSnapshot();
@@ -1462,19 +1560,19 @@
                 logText = `Updated Gantt section title [${ws.sectTitle}]`;
             }
 
-            await updateWorkspaceMetaCloud();
-            await pushActivityLog(logText);
+            updateWorkspaceMetaCloud();
+            pushActivityLog(logText);
             updateGlobalStats();
         }
 
-        window.handleControlTowersHeaderEdit = async function(text) {
+        window.handleControlTowersHeaderEdit = function(text) {
             const ws = workspaces.find(w => w.id === activeWorkspaceId);
             if (!ws) return;
             saveGlobalSnapshot();
             ws.controlTowersLabel = text.trim() || "CONTROL TOWERS";
             
-            await updateWorkspaceMetaCloud();
-            await pushActivityLog(`Updated control towers header title [${ws.controlTowersLabel}]`);
+            updateWorkspaceMetaCloud();
+            pushActivityLog(`Updated control towers header title [${ws.controlTowersLabel}]`);
             showToast("Header title successfully updated.");
         }
 
@@ -1550,30 +1648,44 @@
             updateUndoRedoControls();
         }
 
-        window.triggerUndo = async function() {
+        window.triggerUndo = function() {
             if (historyStack.length === 0) return;
             const previous = historyStack.pop();
             redoStack.push(JSON.parse(JSON.stringify(workspaces)));
 
             workspaces = previous;
-            await updateWorkspaceMetaCloud();
+            updateWorkspaceMetaCloud();
             
             updateUndoRedoControls();
-            await pushActivityLog(`Performed Undo (↩️)`);
+            pushActivityLog(`Performed Undo (↩️)`);
             showToast("Undo successful (↩️)");
+
+            if (activeWorkspaceId) {
+                applyActiveWorkspaceToUI();
+            } else {
+                renderHubView();
+            }
+            updateGlobalStats();
         }
 
-        window.triggerRedo = async function() {
+        window.triggerRedo = function() {
             if (redoStack.length === 0) return;
             const next = redoStack.pop();
             historyStack.push(JSON.parse(JSON.stringify(workspaces)));
 
             workspaces = next;
-            await updateWorkspaceMetaCloud();
+            updateWorkspaceMetaCloud();
             
             updateUndoRedoControls();
-            await pushActivityLog(`Performed Redo (↪️)`);
+            pushActivityLog(`Performed Redo (↪️)`);
             showToast("Redo successful (↪️)");
+
+            if (activeWorkspaceId) {
+                applyActiveWorkspaceToUI();
+            } else {
+                renderHubView();
+            }
+            updateGlobalStats();
         }
 
         function updateUndoRedoControls() {
@@ -1700,7 +1812,7 @@
                 matchedFound = true;
 
                 const wsSegment = document.createElement('div');
-                wsSegment.className = "p-5 bg-white space-y-3";
+                wsSegment.className = "p-5 bg-white space-y-3 animate-fade-in";
                 
                 let percent = matchingInWorkspace.length;
                 wsSegment.innerHTML = `
@@ -1754,7 +1866,7 @@
                             const natureStyle = p.nature === 'Initiate' ? 'bg-slate-900 text-white' : 'bg-slate-200 text-slate-800';
 
                             segmentRowsHtml += `
-                                <div onclick="navigateToProject('${ws.id}', '${p.id}')" class="bg-white border border-slate-200 p-2 rounded-xl text-[9px] shadow-sm flex flex-col justify-between min-h-[70px] cursor-pointer hover:shadow hover:border-slate-400 transition-all font-sans">
+                                <div onclick="navigateToProject('${ws.id}', '${p.id}')" class="bg-white border border-slate-200 p-2 rounded-xl text-[9px] shadow-sm flex flex-col justify-between min-h-[70px] cursor-pointer hover:shadow hover:border-slate-400 transition-all font-sans animate-fade-in">
                                     <div>
                                         <div class="flex justify-between items-center mb-1">
                                             <span class="px-1.5 py-0.2 rounded text-[7px] font-bold ${natureStyle}">${natureLabel}</span>
@@ -1787,7 +1899,7 @@
 
             if (!matchedFound) {
                 container.innerHTML = `
-                    <div class="p-8 text-center text-slate-400 text-xs italic font-sans">
+                    <div class="p-8 text-center text-slate-400 text-xs italic font-sans font-medium">
                         No projects found matching the status filter "${status}".
                     </div>
                 `;
@@ -2005,7 +2117,7 @@
                                  ondragend="handleDragEnd(event, '${proj.id}')"
                                  onclick="selectProject('${proj.id}')" 
                                  ondblclick="event.stopPropagation()"
-                                 class="liquid-glass-card cursor-grab active:cursor-grabbing text-[10px] p-3 rounded-xl border leading-snug ${isSelected} flex flex-col justify-between min-h-[105px] shadow-sm relative hover:shadow-md transition-all">
+                                 class="liquid-glass-card cursor-grab active:cursor-grabbing text-[10px] p-3 rounded-xl border leading-snug ${isSelected} flex flex-col justify-between min-h-[105px] shadow-sm relative hover:shadow-md transition-all animate-fade-in">
                                 <div class="space-y-1.5">
                                     <h4 class="font-extrabold text-slate-900 line-clamp-2 leading-snug tracking-tight text-xs font-sans text-left">${displayedTitle}</h4>
                                     
@@ -2062,7 +2174,7 @@
             document.getElementById('badgeCountUnified').innerText = `${matchedProjectCount} Projects Scheduled`;
         }
 
-        window.triggerAddTowerDirectly = async function() {
+        window.triggerAddTowerDirectly = function() {
             const ws = workspaces.find(w => w.id === activeWorkspaceId);
             if (!ws) return;
 
@@ -2071,19 +2183,15 @@
             ws.towers.push(newKey);
             ws.towerNames[newKey] = "New Control Tower Lane";
 
-            await updateWorkspaceMetaCloud();
-            await pushActivityLog("Instantly added a new Control Tower Lane");
+            updateWorkspaceMetaCloud();
+            pushActivityLog("Instantly added a new Control Tower Lane");
             showToast("New Control Tower Lane appended successfully!");
             
-            if (!isFirebaseEnabled) {
-                saveLocalState();
-                applyActiveWorkspaceToUI();
-            } else {
-                renderMatrices();
-            }
+            applyActiveWorkspaceToUI();
+            updateGlobalStats();
         }
 
-        window.triggerAddQuarterDirectly = async function() {
+        window.triggerAddQuarterDirectly = function() {
             const ws = workspaces.find(w => w.id === activeWorkspaceId);
             if (!ws) return;
 
@@ -2102,16 +2210,12 @@
                 ws.timelines.push(nextCode);
             }
 
-            await updateWorkspaceMetaCloud();
-            await pushActivityLog(`Instantly added new timeline column: [${nextCode}]`);
+            updateWorkspaceMetaCloud();
+            pushActivityLog(`Instantly added new timeline column: [${nextCode}]`);
             showToast(`Timeline column "${nextCode}" added successfully.`);
             
-            if (!isFirebaseEnabled) {
-                saveLocalState();
-                applyActiveWorkspaceToUI();
-            } else {
-                renderMatrices();
-            }
+            applyActiveWorkspaceToUI();
+            updateGlobalStats();
         }
 
         function openModal(modalId, boxId) {
@@ -2152,7 +2256,7 @@
             closeModal('workspaceCreateModal', 'wsCreateModalBox');
         }
 
-        window.saveNewWorkspaceFromModal = async function() {
+        window.saveNewWorkspaceFromModal = function() {
             const nameInput = document.getElementById('wsCreateNameInput').value.trim();
             const subtitleInput = document.getElementById('wsCreateSubtitleInput').value.trim();
 
@@ -2183,8 +2287,8 @@
             };
 
             workspaces.push(customWorkspace);
-            await updateWorkspaceMetaCloud();
-            await pushActivityLog(`Deployed new workspace portfolio: [${nameInput}]`);
+            updateWorkspaceMetaCloud();
+            pushActivityLog(`Deployed new workspace portfolio: [${nameInput}]`);
             
             renderHubView();
             updateGlobalStats();
@@ -2376,7 +2480,7 @@
             }
         }
 
-        window.addTagFromInput = async function(inputElement, type) {
+        window.addTagFromInput = function(inputElement, type) {
             const val = inputElement.value.trim();
             if (!val) return;
 
@@ -2392,19 +2496,15 @@
                 if (!proj.collaborators.includes(val)) proj.collaborators.push(val);
             }
 
-            if (isFirebaseEnabled) {
-                await pushToCloud();
-            } else {
-                saveLocalState();
-            }
-            await pushActivityLog(`Assigned member [${val}] to [${proj.title}]`);
+            triggerBackgroundSync();
+            pushActivityLog(`Assigned member [${val}] to [${proj.title}]`);
 
             inputElement.value = '';
             showProjectDetails(selectedProjectId);
             renderMatrices();
         }
 
-        window.removeTag = async function(tag, type) {
+        window.removeTag = function(tag, type) {
             const ws = workspaces.find(w => w.id === activeWorkspaceId);
             if (!ws) return;
             const proj = ws.projects.find(p => p.id === selectedProjectId);
@@ -2417,18 +2517,14 @@
                 proj.collaborators = proj.collaborators.filter(c => c !== tag);
             }
 
-            if (isFirebaseEnabled) {
-                await pushToCloud();
-            } else {
-                saveLocalState();
-            }
-            await pushActivityLog(`Removed member [${tag}] assignment from [${proj.title}]`);
+            triggerBackgroundSync();
+            pushActivityLog(`Removed member [${tag}] assignment from [${proj.title}]`);
 
             showProjectDetails(selectedProjectId);
             renderMatrices();
         }
 
-        window.toggleEditMode = async function() {
+        window.toggleEditMode = function() {
             const ws = workspaces.find(w => w.id === activeWorkspaceId);
             if (!ws) return;
             const proj = ws.projects.find(p => p.id === selectedProjectId);
@@ -2447,13 +2543,8 @@
                 document.getElementById('btnToggleMode').className = "px-2.5 py-1 text-[10px] font-bold bg-white hover:bg-slate-50 rounded-lg text-slate-800 transition-all font-sans shadow-sm border border-slate-200/50";
                 document.getElementById('btnCancelEdit').classList.add('hidden');
                 
-                if (isFirebaseEnabled) {
-                    await pushToCloud();
-                } else {
-                    saveLocalState();
-                    renderMatrices();
-                }
-                await pushActivityLog(`Updated project scheduling and targets for [${proj.title}]`);
+                triggerBackgroundSync();
+                pushActivityLog(`Updated project scheduling and targets for [${proj.title}]`);
 
                 updateGlobalStats();
                 showToast("Project specifications updated successfully!");
@@ -2512,7 +2603,7 @@
             });
         }
 
-        window.updateProjectField = async function(field, value) {
+        window.updateProjectField = function(field, value) {
             const ws = workspaces.find(w => w.id === activeWorkspaceId);
             if (!ws) return;
             const proj = ws.projects.find(p => p.id === selectedProjectId);
@@ -2521,13 +2612,8 @@
             saveGlobalSnapshot();
             proj[field] = value;
 
-            if (isFirebaseEnabled) {
-                await pushToCloud();
-            } else {
-                saveLocalState();
-                renderMatrices();
-            }
-            
+            triggerBackgroundSync();
+            renderMatrices();
             updateGlobalStats();
         }
 
@@ -2571,7 +2657,7 @@
             });
         }
 
-        window.addSubproject = async function() {
+        window.addSubproject = function() {
             const titleInput = document.getElementById('newSubprojectTitle');
             const title = titleInput.value.trim();
             if (!title) return;
@@ -2591,12 +2677,8 @@
                 updates: []
             });
 
-            if (isFirebaseEnabled) {
-                await pushToCloud();
-            } else {
-                saveLocalState();
-            }
-            await pushActivityLog(`Added subproject [${title}] to parent project [${proj.title}]`);
+            triggerBackgroundSync();
+            pushActivityLog(`Added subproject [${title}] to parent project [${proj.title}]`);
 
             titleInput.value = '';
             showProjectDetails(selectedProjectId);
@@ -2614,17 +2696,13 @@
             requestCustomConfirmation(
                 "Delete Subproject?",
                 "Are you sure you want to permanently delete this subproject? This action cannot be undone.",
-                async () => {
+                () => {
                     saveGlobalSnapshot();
                     const subItem = proj.subprojects.find(s => s.id === subId);
                     proj.subprojects = proj.subprojects.filter(s => s.id !== subId);
 
-                    if (isFirebaseEnabled) {
-                        await pushToCloud();
-                    } else {
-                        saveLocalState();
-                    }
-                    await pushActivityLog(`Deleted subproject [${subItem ? subItem.title : ''}] from [${proj.title}]`);
+                    triggerBackgroundSync();
+                    pushActivityLog(`Deleted subproject [${subItem ? subItem.title : ''}] from [${proj.title}]`);
 
                     showProjectDetails(selectedProjectId);
                     renderMatrices();
@@ -2681,7 +2759,7 @@
             showProjectDetails(selectedProjectId);
         }
 
-        window.toggleSubEditMode = async function() {
+        window.toggleSubEditMode = function() {
             const ws = workspaces.find(w => w.id === activeWorkspaceId);
             if (!ws) return;
             const proj = ws.projects.find(p => p.id === selectedProjectId);
@@ -2702,12 +2780,8 @@
                 document.getElementById('btnToggleSubMode').className = "px-2.5 py-1 text-[10px] font-bold bg-white hover:bg-slate-50 rounded-lg text-slate-800 transition-all font-sans shadow-sm border border-slate-200/50";
                 document.getElementById('btnCancelSubEdit').classList.add('hidden');
                 
-                if (isFirebaseEnabled) {
-                    await pushToCloud();
-                } else {
-                    saveLocalState();
-                }
-                await pushActivityLog(`Updated subproject parameters for [${sub.title}]`);
+                triggerBackgroundSync();
+                pushActivityLog(`Updated subproject parameters for [${sub.title}]`);
 
                 updateGlobalStats();
                 showToast("Subproject specifications saved successfully.");
@@ -2758,7 +2832,7 @@
             });
         }
 
-        window.updateSubprojectField = async function(field, value) {
+        window.updateSubprojectField = function(field, value) {
             const ws = workspaces.find(w => w.id === activeWorkspaceId);
             if (!ws) return;
             const proj = ws.projects.find(p => p.id === selectedProjectId);
@@ -2769,12 +2843,7 @@
             saveGlobalSnapshot();
             sub[field] = value;
 
-            if (isFirebaseEnabled) {
-                await pushToCloud();
-            } else {
-                saveLocalState();
-            }
-
+            triggerBackgroundSync();
             updateGlobalStats();
         }
 
@@ -2795,17 +2864,13 @@
             requestCustomConfirmation(
                 "Delete Subproject?",
                 "Are you sure you want to permanently delete this subproject and its progress notes? This cannot be undone.",
-                async () => {
+                () => {
                     saveGlobalSnapshot();
                     const deletedTitle = proj.subprojects.find(s => s.id === selectedSubprojectId)?.title || '';
                     proj.subprojects = proj.subprojects.filter(s => s.id !== selectedSubprojectId);
 
-                    if (isFirebaseEnabled) {
-                        await pushToCloud();
-                    } else {
-                        saveLocalState();
-                    }
-                    await pushActivityLog(`Permanently deleted subproject [${deletedTitle}]`);
+                    triggerBackgroundSync();
+                    pushActivityLog(`Permanently deleted subproject [${deletedTitle}]`);
 
                     selectedSubprojectId = null;
                     showProjectDetails(selectedProjectId);
@@ -2889,7 +2954,7 @@
                     if (relatedIds.includes(p.id)) {
                         count++;
                         const badge = document.createElement('div');
-                        badge.className = "flex items-center gap-1.5 bg-black text-white px-2.5 py-1 rounded-lg text-[9px] font-bold shadow-sm transition-all font-sans";
+                        badge.className = "flex items-center gap-1.5 bg-black text-white px-2.5 py-1 rounded-lg text-[9px] font-bold shadow-sm transition-all font-sans animate-fade-in";
                         badge.innerHTML = `
                             <span class="max-w-[120px] truncate" title="${escapeHtml(p.title)}">${escapeHtml(p.title)}</span>
                             ${isEditModeActive ? `
@@ -2907,7 +2972,7 @@
             }
         }
 
-        window.handleAddRelated = async function(relatedId) {
+        window.handleAddRelated = function(relatedId) {
             if (!relatedId) return;
 
             const ws = workspaces.find(w => w.id === activeWorkspaceId);
@@ -2932,18 +2997,13 @@
                 }
             });
 
-            if (isFirebaseEnabled) {
-                await pushToCloud();
-            } else {
-                saveLocalState();
-            }
-
-            await pushActivityLog(`Established strategic route dependency mapping: [${proj.title}] 🔗 [${oppositeTitle}]`);
+            triggerBackgroundSync();
+            pushActivityLog(`Established strategic route dependency mapping: [${proj.title}] 🔗 [${oppositeTitle}]`);
             showProjectDetails(selectedProjectId);
             showToast("Project dependency mapped successfully!");
         }
 
-        window.disconnectRelated = async function(relatedId) {
+        window.disconnectRelated = function(relatedId) {
             const ws = workspaces.find(w => w.id === activeWorkspaceId);
             if (!ws) return;
             const proj = ws.projects.find(p => p.id === selectedProjectId);
@@ -2962,13 +3022,8 @@
                 }
             });
 
-            if (isFirebaseEnabled) {
-                await pushToCloud();
-            } else {
-                saveLocalState();
-            }
-
-            await pushActivityLog(`Severed project dependency mapping: [${proj.title}] 💔 [${oppositeTitle}]`);
+            triggerBackgroundSync();
+            pushActivityLog(`Severed project dependency mapping: [${proj.title}] 💔 [${oppositeTitle}]`);
             showProjectDetails(selectedProjectId);
             showToast("Dependency mapping successfully severed.");
         }
@@ -2985,7 +3040,7 @@
 
             updatesArray.forEach((log, index) => {
                 const block = document.createElement('div');
-                block.className = "p-2.5 rounded-xl bg-white/60 border border-slate-200/50 text-[10px] space-y-1 relative group transition-all font-sans";
+                block.className = "p-2.5 rounded-xl bg-white/60 border border-slate-200/50 text-[10px] space-y-1 relative group transition-all font-sans animate-fade-in";
                 block.innerHTML = `
                     <div class="flex justify-between items-center text-slate-400 font-bold text-[8.5px] pr-5 font-sans">
                         <span>👤 ${escapeHtml(log.updater || 'Admin')}</span>
@@ -3012,17 +3067,13 @@
             requestCustomConfirmation(
                 "Delete Progress Log Entry?",
                 "Are you sure you want to permanently delete this milestone entry? This cannot be undone.",
-                async () => {
+                () => {
                     saveGlobalSnapshot();
                     const delLogText = proj.updates[index]?.text || '';
                     proj.updates.splice(index, 1);
 
-                    if (isFirebaseEnabled) {
-                        await pushToCloud();
-                    } else {
-                        saveLocalState();
-                    }
-                    await pushActivityLog(`Permanently deleted milestone update [${delLogText}] from [${proj.title}]`);
+                    triggerBackgroundSync();
+                    pushActivityLog(`Permanently deleted milestone update [${delLogText}] from [${proj.title}]`);
 
                     showProjectDetails(selectedProjectId);
                     showToast("Log entry permanently deleted.");
@@ -3042,7 +3093,7 @@
 
             subUpdatesArray.forEach((log, index) => {
                 const block = document.createElement('div');
-                block.className = "p-2.5 rounded-xl bg-white/60 border border-slate-200/50 text-[10px] space-y-1 relative group transition-all font-sans";
+                block.className = "p-2.5 rounded-xl bg-white/60 border border-slate-200/50 text-[10px] space-y-1 relative group transition-all font-sans animate-fade-in";
                 block.innerHTML = `
                     <div class="flex justify-between items-center text-slate-400 font-bold text-[8.5px] pr-5 font-sans">
                         <span>👤 ${escapeHtml(log.updater || 'Admin')}</span>
@@ -3071,17 +3122,13 @@
             requestCustomConfirmation(
                 "Delete Subproject Log Entry?",
                 "Are you sure you want to permanently delete this subproject milestone update? This cannot be undone.",
-                async () => {
+                () => {
                     saveGlobalSnapshot();
                     const deletedText = sub.updates[index]?.text || '';
                     sub.updates.splice(index, 1);
 
-                    if (isFirebaseEnabled) {
-                        await pushToCloud();
-                    } else {
-                        saveLocalState();
-                    }
-                    await pushActivityLog(`Permanently deleted subproject milestone update [${deletedText}] from [${sub.title}]`);
+                    triggerBackgroundSync();
+                    pushActivityLog(`Permanently deleted subproject milestone update [${deletedText}] from [${sub.title}]`);
 
                     enterSubprojectDetail(selectedSubprojectId);
                     showToast("Log entry permanently deleted.");
@@ -3089,7 +3136,7 @@
             );
         }
 
-        window.addProgressNote = async function() {
+        window.addProgressNote = function() {
             const textInput = document.getElementById('newProgressNote');
             const updaterInput = document.getElementById('newProgressUpdater');
 
@@ -3111,12 +3158,8 @@
                 updater: updater
             });
 
-            if (isFirebaseEnabled) {
-                await pushToCloud();
-            } else {
-                saveLocalState();
-            }
-            await pushActivityLog(`Logged milestone update on project [${proj.title}]: [${text}]`);
+            triggerBackgroundSync();
+            pushActivityLog(`Logged milestone update on project [${proj.title}]: [${text}]`);
             
             textInput.value = '';
             updaterInput.value = '';
@@ -3124,7 +3167,7 @@
             showToast("Progress log entry saved.");
         }
 
-        window.addSubProgressNote = async function() {
+        window.addSubProgressNote = function() {
             const textInput = document.getElementById('newSubProgressNote');
             const updaterInput = document.getElementById('newSubProgressUpdater');
 
@@ -3148,12 +3191,8 @@
                 updater: updater
             });
 
-            if (isFirebaseEnabled) {
-                await pushToCloud();
-            } else {
-                saveLocalState();
-            }
-            await pushActivityLog(`Logged milestone update on subproject [${sub.title}]: [${text}]`);
+            triggerBackgroundSync();
+            pushActivityLog(`Logged milestone update on subproject [${sub.title}]: [${text}]`);
             
             textInput.value = '';
             updaterInput.value = '';
@@ -3170,16 +3209,12 @@
             requestCustomConfirmation(
                 "Delete Project Card?",
                 `Are you sure you want to permanently delete project "${proj.title}"? This will permanently erase all linked subprojects and progress logs.`,
-                async () => {
+                () => {
                     saveGlobalSnapshot();
                     
                     ws.projects = ws.projects.filter(p => p.id !== selectedProjectId);
-                    if (isFirebaseEnabled) {
-                        await pushToCloud();
-                    } else {
-                        saveLocalState();
-                    }
-                    await pushActivityLog(`Permanently deleted project scheduled card: [${proj.title}]`);
+                    updateWorkspaceMetaCloud();
+                    pushActivityLog(`Permanently deleted project scheduled card: [${proj.title}]`);
 
                     closeDetails();
                     updateGlobalStats();
@@ -3188,7 +3223,7 @@
             );
         }
 
-        window.handleCellDblClick = async function(event, tower, time) {
+        window.handleCellDblClick = function(event, tower, time) {
             if (event.target !== event.currentTarget) return; 
 
             const ws = workspaces.find(w => w.id === activeWorkspaceId);
@@ -3214,12 +3249,8 @@
             };
 
             ws.projects.push(emptyProj);
-            if (isFirebaseEnabled) {
-                await pushToCloud();
-            } else {
-                saveLocalState();
-            }
-            await pushActivityLog(`Double-clicked timeline grid to schedule project [${emptyProj.title}] under Lane [${getTowerText(tower)}] - Quarter [${time}]`);
+            updateWorkspaceMetaCloud();
+            pushActivityLog(`Double-clicked timeline grid to schedule project [${emptyProj.title}] under Lane [${getTowerText(tower)}] - Quarter [${time}]`);
 
             updateGlobalStats();
             
@@ -3267,7 +3298,7 @@
             if (cell) cell.classList.remove('drag-over-cell');
         }
 
-        window.handleDrop = async function(event, tower, time, cellId) {
+        window.handleDrop = function(event, tower, time, cellId) {
             event.preventDefault();
             const cell = document.getElementById(cellId);
             if (cell) cell.classList.remove('drag-over-cell');
@@ -3289,14 +3320,11 @@
             proj.tower = tower;
             proj.timeline = time;
 
-            if (isFirebaseEnabled) {
-                await pushToCloud();
-            } else {
-                saveLocalState();
-                renderMatrices();
-            }
-            await pushActivityLog(`Rescheduled [${proj.title}] from Lane [${getTowerText(oldTower)} : ${oldTimeline}] to Lane [${getTowerText(tower)} : ${time}]`);
+            updateWorkspaceMetaCloud();
+            pushActivityLog(`Rescheduled [${proj.title}] from Lane [${getTowerText(oldTower)} : ${oldTimeline}] to Lane [${getTowerText(tower)} : ${time}]`);
 
+            // 0ms 瞬间本地重绘
+            renderMatrices();
             showToast(`Successfully rescheduled "${proj.title}"`);
             
             if (selectedProjectId === draggedCardId) {
@@ -3330,7 +3358,7 @@
             if (header) header.classList.remove('drag-over-header');
         }
 
-        window.handleQuarterDrop = async function(event, targetTime) {
+        window.handleQuarterDrop = function(event, targetTime) {
             event.preventDefault();
             const header = document.getElementById(`qhead-${targetTime}`);
             if (header) header.classList.remove('drag-over-header');
@@ -3350,10 +3378,10 @@
                 ws.timelines.splice(toIdx, 0, draggedQuarter);
                 ws.manuallySorted = true; 
                 
-                await updateWorkspaceMetaCloud();
-                await pushActivityLog(`Reordered Quarter columns: Dragged [${draggedQuarter}] to [${targetTime}]`);
+                updateWorkspaceMetaCloud();
+                pushActivityLog(`Reordered Quarter columns: Dragged [${draggedQuarter}] to [${targetTime}]`);
                 showToast("Quarter columns reordered successfully.");
-                if (!isFirebaseEnabled) applyActiveWorkspaceToUI();
+                applyActiveWorkspaceToUI();
             }
         }
 
@@ -3383,7 +3411,7 @@
             if (container) container.classList.remove('drag-over-cell');
         }
 
-        window.handleTowerDrop = async function(event, targetTower) {
+        window.handleTowerDrop = function(event, targetTower) {
             event.preventDefault();
             const container = document.getElementById('thead-' + targetTower);
             if (container) container.classList.remove('drag-over-cell');
@@ -3402,10 +3430,10 @@
                 ws.towers.splice(fromIdx, 1);
                 ws.towers.splice(toIdx, 0, draggedTower);
                 
-                await updateWorkspaceMetaCloud();
-                await pushActivityLog(`Reordered Control Tower Lanes: Dragged [${getTowerText(draggedTower)}] to [${getTowerText(targetTower)}]`);
+                updateWorkspaceMetaCloud();
+                pushActivityLog(`Reordered Control Tower Lanes: Dragged [${getTowerText(draggedTower)}] to [${getTowerText(targetTower)}]`);
                 showToast("Control Tower Lanes reordered successfully.");
-                if (!isFirebaseEnabled) applyActiveWorkspaceToUI();
+                applyActiveWorkspaceToUI();
             }
         }
 
@@ -3422,7 +3450,7 @@
             activeQuarterForModal = null;
         }
 
-        window.submitQuarterRename = async function() {
+        window.submitQuarterRename = function() {
             if (!activeQuarterForModal) return;
             const inputVal = document.getElementById('renameQuarterInput').value.trim();
 
@@ -3449,16 +3477,11 @@
                 p.timeline = inputVal;
             }
 
-            if (isFirebaseEnabled) {
-                await pushToCloud();
-            } else {
-                saveLocalState();
-                applyActiveWorkspaceToUI();
-            }
-
-            await pushActivityLog(`Renamed Quarter timeline column code from [${activeQuarterForModal}] to [${inputVal}]`);
+            updateWorkspaceMetaCloud();
+            pushActivityLog(`Renamed Quarter timeline column code from [${activeQuarterForModal}] to [${inputVal}]`);
             closeQuarterActionModal();
             showToast(`Quarter renamed successfully to: ${inputVal}`);
+            applyActiveWorkspaceToUI();
         }
 
         window.triggerDeleteFromQuarterModal = function() {
@@ -3472,17 +3495,17 @@
             requestCustomConfirmation(
                 "Delete Timeline Column?",
                 `Are you sure you want to permanently delete Quarter column "${target}"? All projects scheduled under this quarter will be permanently deleted.`,
-                async () => {
+                () => {
                     saveGlobalSnapshot();
                     
                     ws.projects = ws.projects.filter(p => p.timeline !== target);
                     ws.timelines = ws.timelines.filter(t => t !== target);
-                    await updateWorkspaceMetaCloud();
-                    await pushActivityLog(`Deleted timeline column [${target}] and erased all associated projects.`);
+                    updateWorkspaceMetaCloud();
+                    pushActivityLog(`Deleted timeline column [${target}] and erased all associated projects.`);
                     
                     updateGlobalStats();
                     showToast(`Quarter column "${target}" and associated projects deleted.`);
-                    if (!isFirebaseEnabled) applyActiveWorkspaceToUI();
+                    applyActiveWorkspaceToUI();
                 }
             );
         }
@@ -3503,7 +3526,7 @@
             activeTowerForModal = null;
         }
 
-        window.submitTowerRename = async function() {
+        window.submitTowerRename = function() {
             if (!activeTowerForModal) return;
             const inputVal = document.getElementById('renameTowerInput').value.trim();
 
@@ -3519,11 +3542,11 @@
             const oldName = ws.towerNames[activeTowerForModal] || activeTowerForModal;
             ws.towerNames[activeTowerForModal] = inputVal;
 
-            await updateWorkspaceMetaCloud();
-            await pushActivityLog(`Renamed Control Tower Lane from [${oldName}] to [${inputVal}]`);
+            updateWorkspaceMetaCloud();
+            pushActivityLog(`Renamed Control Tower Lane from [${oldName}] to [${inputVal}]`);
             closeTowerActionModal();
             showToast(`Lane renamed successfully to: ${inputVal}`);
-            if (!isFirebaseEnabled) applyActiveWorkspaceToUI();
+            applyActiveWorkspaceToUI();
         }
 
         window.triggerDeleteFromTowerModal = function() {
@@ -3537,7 +3560,7 @@
             requestCustomConfirmation(
                 "Delete Control Tower Lane?",
                 `Are you sure you want to permanently delete Lane "${ws.towerNames[target] || target}"? All scheduled projects under this lane will be permanently deleted.`,
-                async () => {
+                () => {
                     saveGlobalSnapshot();
                     const oldTowerName = ws.towerNames[target] || target;
                     
@@ -3545,36 +3568,44 @@
                     ws.towers = ws.towers.filter(t => t !== target);
                     if (ws.towerNames[target]) delete ws.towerNames[target];
 
-                    await updateWorkspaceMetaCloud();
-                    await pushActivityLog(`Deleted Control Tower Lane [${oldTowerName}] and erased all associated projects.`);
+                    updateWorkspaceMetaCloud();
+                    pushActivityLog(`Deleted Control Tower Lane [${oldTowerName}] and erased all associated projects.`);
                     
                     updateGlobalStats();
                     showToast("Lane and associated projects deleted successfully.");
-                    if (!isFirebaseEnabled) applyActiveWorkspaceToUI();
+                    applyActiveWorkspaceToUI();
                 }
             );
         }
 
         function initApp() {
-            initAuth().then(() => {
-                setupSearchInput();
-                updateUndoRedoControls();
+            setupSearchInput();
+            updateUndoRedoControls();
+            
+            // 预先装载本地存储或默认种子，消灭卡死与空白屏，进入即拥有完美的骨架呈现
+            loadFromLocalStorageOrSeed();
+            updateGlobalStats();
+            
+            // 本地登录状态前置校验
+            const sessionName = sessionStorage.getItem('collaborator_name');
+            if (sessionName) {
+                currentUserName = sessionName;
+                document.getElementById('loginOverlay').style.display = 'none';
                 
-                // 本地登录前检测
-                const sessionName = sessionStorage.getItem('collaborator_name');
-                if (sessionName) {
-                    currentUserName = sessionName;
-                    document.getElementById('loginOverlay').style.display = 'none';
-                    startRealtimeSync();
+                // 立即秒开渲染，避免任何等待
+                if (activeWorkspaceId) {
+                    applyActiveWorkspaceToUI();
                 } else {
-                    document.getElementById('loginOverlay').style.display = 'flex';
+                    renderHubView();
                 }
-            }).catch(err => {
-                console.error("Startup failure, switching to local preview mode: ", err);
-                isFirebaseEnabled = false;
-                setupSearchInput();
-                updateUndoRedoControls();
-            });
+                
+                // 后台默默建立连接
+                startRealtimeSync();
+            } else {
+                document.getElementById('loginOverlay').style.display = 'flex';
+                // 哪怕遮罩层还在，也在底层渲染好华丽的 Dashboard，提供极佳视觉深度
+                renderHubView();
+            }
         }
 
         if (document.readyState === 'complete' || document.readyState === 'interactive') {
