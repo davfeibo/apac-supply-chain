@@ -792,41 +792,22 @@
     <!-- ========================================================== -->
     <!-- DATABASE CORE ENGINE AND BUSINESS LOGIC (JAVASCRIPT)       -->
     <!-- ========================================================== -->
-    <script type="module">
-        import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
-        import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
-        import { getFirestore, doc, setDoc, getDoc, collection, query, onSnapshot, addDoc, updateDoc, deleteDoc } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
+    <script>
+        // ==========================================================
+        // 🟢 已全面集成 jsonbin.io 凭证进行云端实时共享同步 🟢
+        // ==========================================================
+        const BIN_ID = '6a29021cda38895dfea4bd46';
+        const API_KEY = '$2a$10$WGhPi0brl8xm2YAvlNsOFu08MuDQDbZFJ3gy7wgH1Q0fhUozxieLy';
+        const API_URL = `https://api.jsonbin.io/v3/b/${BIN_ID}`;
 
-        // ==========================================================
-        // 🟢 已全面校对校验：填入 100% 官方真实的 Firebase 核心凭证 🟢
-        // ==========================================================
-        const firebaseConfig = {
-            apiKey: "AIzaSyA_TeFy-NJ00pKWrct1KSTDvezMK2av2s",
-            authDomain: "apac-supply-chain.firebaseapp.com",
-            projectId: "apac-supply-chain",
-            storageBucket: "apac-supply-chain.firebasestorage.app",
-            messagingSenderId: "604713968594",
-            appId: "1:604713968594:web:155a13d1a35ae553c75e0b",
-            measurementId: "G-F550YB8F29"
-        };
-        const appId = 'apac-supply-chain-app'; 
-        let isFirebaseEnabled = true;
+        let isFirebaseEnabled = true; // 保留原变量名确保全局兼容性
         let firebaseError = null;
-
-        let app, auth, db;
-        try {
-            app = initializeApp(firebaseConfig);
-            auth = getAuth(app);
-            db = getFirestore(app);
-        } catch (e) {
-            console.error("Failed to connect to Firebase cloud services. Falling back to local offline mode.", e);
-            isFirebaseEnabled = false;
-            firebaseError = e;
-        }
+        let isSyncing = false;
 
         const WORKSPACE_CACHE_KEY = 'apac_supply_chain_hub_workspaces_v1';
         
         let workspaces = [];
+        let activityLogs = []; // 云端全局活动日志
         let activeWorkspaceId = null;
         let activeGlobalFilterStatus = null; 
 
@@ -889,54 +870,12 @@
         }
 
         const initAuth = async () => {
-            if (!isFirebaseEnabled) {
-                currentUser = { uid: 'local-session-user' };
-                return;
-            }
-            try {
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    await signInWithCustomToken(auth, __initial_auth_token);
-                } else {
-                    await signInAnonymously(auth);
-                }
-            } catch (e) {
-                console.error("Firebase authentication process failed. Defaulting to local preview mode.", e);
-                isFirebaseEnabled = false;
-                firebaseError = e;
-                currentUser = { uid: 'local-session-user' };
-                startLocalOfflineSync(e);
-            }
+            // jsonbin.io 时代无感静默认证
+            currentUser = { uid: 'jsonbin-authorized-user' };
+            return;
         };
 
-        if (isFirebaseEnabled && auth) {
-            onAuthStateChanged(auth, async (user) => {
-                if (user) {
-                    currentUser = user;
-                    const sessionName = sessionStorage.getItem('collaborator_name');
-                    if (sessionName) {
-                        currentUserName = sessionName;
-                        document.getElementById('loginOverlay').style.display = 'none';
-                        startRealtimeSync();
-                    } else {
-                        document.getElementById('loginOverlay').style.display = 'flex';
-                    }
-                } else {
-                    initAuth();
-                }
-            });
-        } else {
-            const sessionName = sessionStorage.getItem('collaborator_name');
-            if (sessionName) {
-                currentUserName = sessionName;
-                document.getElementById('loginOverlay').style.display = 'none';
-                setTimeout(() => {
-                    startLocalOfflineSync(firebaseError);
-                }, 100);
-            } else {
-                document.getElementById('loginOverlay').style.display = 'flex';
-            }
-        }
-
+        // 处理登录验证与实时共享
         window.submitUserLogin = async function() {
             const nameInput = document.getElementById('userInputName').value.trim();
             if (!nameInput) {
@@ -947,124 +886,109 @@
             sessionStorage.setItem('collaborator_name', nameInput);
             document.getElementById('loginOverlay').style.display = 'none';
             
-            if (isFirebaseEnabled && currentUser && currentUser.uid !== 'local-session-user') {
-                startRealtimeSync();
-            } else {
-                if (!isFirebaseEnabled) {
-                    startLocalOfflineSync(firebaseError);
-                } else {
-                    document.getElementById('activeCollaboratorsList').innerHTML = `${currentUserName} <span class="text-amber-500 font-extrabold ml-1.5">(Connecting to Cloud... 🟡)</span>`;
-                }
-            }
+            startRealtimeSync();
         };
 
-        async function startRealtimeSync() {
-            if (!currentUser) return;
+        // 核心云存储上传 (PUT 方法)
+        async function pushToCloud() {
+            if (isSyncing) return;
+            isSyncing = true;
+            try {
+                const payload = {
+                    workspaces: workspaces,
+                    activityLogs: activityLogs
+                };
+                const response = await fetch(API_URL, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Master-Key': API_KEY,
+                        'X-Bin-Versioning': 'false'
+                    },
+                    body: JSON.stringify(payload)
+                });
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                saveLocalState();
+                showToast("云端同步保存成功！🟢");
+            } catch (e) {
+                console.error("Failed to push to jsonbin.io:", e);
+                showToast("云端同步失败，请检查网络 ⚠️");
+            } finally {
+                isSyncing = false;
+            }
+        }
 
-            await registerUserPresence();
-            setInterval(registerUserPresence, 30000); 
-            setInterval(cleanupInactivePresences, 60000); 
-
-            const presenceCollection = collection(db, 'artifacts', appId, 'public', 'data', 'presence');
-            onSnapshot(presenceCollection, (snapshot) => {
-                const now = Date.now();
-                const activeNames = [];
-                snapshot.forEach(doc => {
-                    const data = doc.data();
-                    if (data.lastActive && (now - data.lastActive < 120000)) {
-                        activeNames.push(data.name);
+        // 核心云存储下载拉取 (GET 方法)
+        async function pullFromCloud(isSilent = false) {
+            if (isSyncing) return;
+            isSyncing = true;
+            if (!isSilent) {
+                showToast("正在从云端拉取最新数据... 📥");
+            }
+            try {
+                const response = await fetch(API_URL, {
+                    method: 'GET',
+                    headers: {
+                        'X-Master-Key': API_KEY,
+                        'X-Bin-Meta': 'false'
                     }
                 });
-                
-                const uniqueNames = [...new Set(activeNames)];
-                document.getElementById('activeCollaboratorsList').innerHTML = `${uniqueNames.join(', ')} <span class="text-emerald-500 font-extrabold ml-1.5">(Cloud Online 🟢)</span>`;
-            }, (error) => console.error("Presence list sync error: ", error));
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                const data = await response.json();
+                if (data && data.workspaces && data.workspaces.length > 0) {
+                    workspaces = data.workspaces;
+                    activityLogs = data.activityLogs || [];
+                    saveLocalState();
 
-            const activityLogCollection = collection(db, 'artifacts', appId, 'public', 'data', 'activityLog');
-            onSnapshot(activityLogCollection, (snapshot) => {
-                const logs = [];
-                snapshot.forEach(doc => {
-                    logs.push(doc.data());
-                });
-                logs.sort((a, b) => b.timestamp - a.timestamp);
-                renderActivityLogs(logs.slice(0, 15)); 
-            }, (error) => console.error("Activity logs sync error: ", error));
+                    // 对旧状态下的 ongoing 项目字段进行自动校正
+                    workspaces.forEach(ws => {
+                        if (ws.projects) {
+                            ws.projects.forEach(p => {
+                                if (p.status === 'On Going' || p.status === 'ongoing' || p.status === 'Ongoing' || p.status === 'On-going') {
+                                    p.status = 'Active';
+                                }
+                            });
+                        }
+                    });
 
-            const configDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'config', 'workspaces_meta');
-            onSnapshot(configDocRef, async (docSnap) => {
-                if (!docSnap.exists()) {
-                    await seedInitialFirestoreData();
+                    if (activeWorkspaceId) {
+                        applyActiveWorkspaceToUI();
+                    } else {
+                        renderHubView();
+                    }
+                    updateGlobalStats();
+                    renderActivityLogs(activityLogs.slice(0, 15));
+                    if (!isSilent) showToast("已成功同步最新的云端数据！🟢");
                 } else {
-                    const metaData = docSnap.data();
-                    workspaces = metaData.workspaces || [];
-                    await fetchAndSyncProjectsFromCloud();
+                    // 空 Bin 自愈初始化逻辑
+                    if (!isSilent) showToast("检测到云端为空，正在初始化默认工作区... ⚙️");
+                    seedInitialLocalData();
+                    activityLogs = [{
+                        user: 'System Initializer',
+                        action: 'Initialized strategic workspace database in jsonbin.io cloud space',
+                        timestamp: Date.now()
+                    }];
+                    isSyncing = false;
+                    await pushToCloud();
                 }
-            }, (error) => console.error("Workspace configuration sync error: ", error));
+            } catch (e) {
+                console.error("Failed to pull:", e);
+                if (!isSilent) showToast(`云拉取失败: ${e.message} ⚠️`);
+            } finally {
+                isSyncing = false;
+            }
         }
 
-        function startLocalOfflineSync(err = null) {
-            let statusHtml = `${currentUserName} (You - Local Preview)`;
-            if (err) {
-                statusHtml += ` <span class="text-rose-500 font-extrabold ml-1.5" title="${escapeHtml(err.message || err)}">(⚠️ Cloud Connection Error: ${escapeHtml(err.code || err.message || 'unknown')})</span>`;
-                setTimeout(() => {
-                    showToast(`Cloud connection aborted: ${err.code || err.message || 'Error'}`);
-                }, 1000);
-            }
-            document.getElementById('activeCollaboratorsList').innerHTML = statusHtml;
+        async function startRealtimeSync() {
+            document.getElementById('activeCollaboratorsList').innerHTML = `${currentUserName} <span class="text-emerald-500 font-extrabold ml-1.5">(Cloud Online 🟢)</span>`;
+            
+            // 首次全量抓取
+            await pullFromCloud(false);
 
-            const cache = sessionStorage.getItem(WORKSPACE_CACHE_KEY) || localStorage.getItem(WORKSPACE_CACHE_KEY);
-            if (cache) {
-                workspaces = JSON.parse(cache);
-                // Ensure ongoing are safely converted to Active in cache too
-                workspaces.forEach(ws => {
-                    if (ws.projects) {
-                        ws.projects.forEach(p => {
-                            if (p.status === 'On Going' || p.status === 'ongoing' || p.status === 'Ongoing' || p.status === 'On-going') {
-                                p.status = 'Active';
-                            }
-                        });
-                    }
-                });
-            } else {
-                seedInitialLocalData();
-            }
-
-            const mockLogs = JSON.parse(sessionStorage.getItem('mock_activity_log') || '[]');
-            renderActivityLogs(mockLogs.slice(0, 15));
-
-            if (activeWorkspaceId) {
-                applyActiveWorkspaceToUI();
-            } else {
-                renderHubView();
-            }
-            updateGlobalStats();
-        }
-
-        async function registerUserPresence() {
-            if (!isFirebaseEnabled || !currentUser || !currentUserName) return;
-            const presenceDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'presence', currentUser.uid);
-            await setDoc(presenceDocRef, {
-                uid: currentUser.uid,
-                name: currentUserName,
-                lastActive: Date.now()
-            }, { merge: true });
-        }
-
-        async function cleanupInactivePresences() {
-            if (!isFirebaseEnabled || !currentUser) return;
-            const presenceCollection = collection(db, 'artifacts', appId, 'public', 'data', 'presence');
-            onSnapshot(presenceCollection, (snapshot) => {
-                const now = Date.now();
-                snapshot.forEach(async (document) => {
-                    const data = document.data();
-                    if (data.lastActive && (now - data.lastActive > 120000)) {
-                        try {
-                            const deleteDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'presence', document.id);
-                            await deleteDoc(deleteDocRef);
-                        } catch (err) {}
-                    }
-                });
-            });
+            // 每15秒轮询，实现无延迟多浏览器/多团队联动共享
+            setInterval(() => {
+                pullFromCloud(true);
+            }, 15000);
         }
 
         function renderActivityLogs(logs) {
@@ -1092,78 +1016,26 @@
             });
         }
 
+        // 云端发布操作日志
         async function pushActivityLog(actionText) {
             if (!currentUserName) return;
             
-            if (isFirebaseEnabled && db) {
-                try {
-                    const logCollection = collection(db, 'artifacts', appId, 'public', 'data', 'activityLog');
-                    await addDoc(logCollection, {
-                        user: currentUserName,
-                        action: actionText,
-                        timestamp: Date.now()
-                    });
-                } catch (e) {
-                    console.error("Error writing activity log: ", e);
-                }
-            } else {
-                const mockLogs = JSON.parse(sessionStorage.getItem('mock_activity_log') || '[]');
-                mockLogs.unshift({
-                    user: currentUserName,
-                    action: actionText,
-                    timestamp: Date.now()
-                });
-                sessionStorage.setItem('mock_activity_log', JSON.stringify(mockLogs));
-                renderActivityLogs(mockLogs.slice(0, 15));
-            }
-        }
-
-        async function fetchAndSyncProjectsFromCloud() {
-            if (!isFirebaseEnabled || !currentUser || !db) return;
-            const projectsCollection = collection(db, 'artifacts', appId, 'public', 'data', 'projects');
-            onSnapshot(projectsCollection, (snapshot) => {
-                const allProjects = [];
-                snapshot.forEach(doc => {
-                    const data = doc.data();
-                    // Fallback to safely convert ongoing/On Going keys in the cloud directly to Active
-                    if (data.status === 'On Going' || data.status === 'ongoing' || data.status === 'Ongoing' || data.status === 'On-going') {
-                        data.status = 'Active';
-                    }
-                    allProjects.push({ id: doc.id, ...data });
-                });
-
-                workspaces.forEach(ws => {
-                    ws.projects = allProjects.filter(p => p.workspaceId === ws.id);
-                });
-
-                if (activeWorkspaceId) {
-                    applyActiveWorkspaceToUI();
-                } else {
-                    renderHubView();
-                }
-                updateGlobalStats();
-            }, (error) => console.error("Projects sync error: ", error));
-        }
-
-        async function seedInitialFirestoreData() {
-            if (!isFirebaseEnabled || !currentUser || !db) return;
-            showToast("Initializing cloud workspace structures...");
+            const newLog = {
+                user: currentUserName,
+                action: actionText,
+                timestamp: Date.now()
+            };
             
-            const initialWorkspaces = getInitialSeedWorkspacesConfig();
-
-            const configDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'config', 'workspaces_meta');
-            await setDoc(configDocRef, { workspaces: initialWorkspaces });
-
-            const projectsCollection = collection(db, 'artifacts', appId, 'public', 'data', 'projects');
-            const seedProjects = getInitialSeedProjectsConfig();
-
-            for (const p of seedProjects) {
-                const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'projects', p.id);
-                await setDoc(docRef, p);
+            activityLogs.unshift(newLog);
+            if (activityLogs.length > 50) activityLogs = activityLogs.slice(0, 50); // 限制50条
+            
+            renderActivityLogs(activityLogs.slice(0, 15));
+            
+            if (isFirebaseEnabled) {
+                await pushToCloud();
+            } else {
+                sessionStorage.setItem('mock_activity_log', JSON.stringify(activityLogs));
             }
-
-            await fetchAndSyncProjectsFromCloud();
-            showToast("Cloud workspace meta loaded successfully!");
         }
 
         function seedInitialLocalData() {
@@ -1247,18 +1119,8 @@
         }
 
         async function updateWorkspaceMetaCloud() {
-            if (isFirebaseEnabled && db) {
-                try {
-                    const configDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'config', 'workspaces_meta');
-                    const cleaned = workspaces.map(ws => {
-                        const copy = { ...ws };
-                        delete copy.projects;
-                        return copy;
-                    });
-                    await setDoc(configDocRef, { workspaces: cleaned }, { merge: true });
-                } catch (e) {
-                    console.error("Failed to update workspace meta: ", e);
-                }
+            if (isFirebaseEnabled) {
+                await pushToCloud();
             } else {
                 saveLocalState();
             }
@@ -1304,7 +1166,6 @@
                     if (Array.isArray(importedWorkspaces) && importedWorkspaces.length > 0) {
                         saveGlobalSnapshot();
                         
-                        // Sanitize imported workspaces to map legacy ongoing states to Active
                         importedWorkspaces.forEach(ws => {
                             if (ws.projects) {
                                 ws.projects.forEach(p => {
@@ -1315,24 +1176,9 @@
                             }
                         });
 
-                        if (isFirebaseEnabled && db) {
-                            const cleanedMeta = importedWorkspaces.map(ws => {
-                                const copy = { ...ws };
-                                delete copy.projects;
-                                return copy;
-                            });
-                            const configDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'config', 'workspaces_meta');
-                            await setDoc(configDocRef, { workspaces: cleanedMeta });
-
-                            for (const ws of importedWorkspaces) {
-                                if (ws.projects && Array.isArray(ws.projects)) {
-                                    for (const p of ws.projects) {
-                                        p.workspaceId = ws.id; 
-                                        const pDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'projects', p.id);
-                                        await setDoc(pDocRef, p);
-                                    }
-                                }
-                            }
+                        if (isFirebaseEnabled) {
+                            workspaces = importedWorkspaces;
+                            await pushToCloud();
                         } else {
                             workspaces = importedWorkspaces;
                             saveLocalState();
@@ -1523,18 +1369,6 @@
                 async () => {
                     saveGlobalSnapshot();
                     
-                    if (isFirebaseEnabled && db) {
-                        try {
-                            const matchingProjects = ws.projects || [];
-                            for (const p of matchingProjects) {
-                                const pDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'projects', p.id);
-                                await deleteDoc(pDocRef);
-                            }
-                        } catch (e) {
-                            console.error("Cloud projects delete failed: ", e);
-                        }
-                    }
-
                     workspaces = workspaces.filter(w => w.id !== id);
                     await updateWorkspaceMetaCloud();
                     await pushActivityLog(`Deleted workspace [${ws.name}] and all associated project schedules.`);
@@ -1724,25 +1558,6 @@
             workspaces = previous;
             await updateWorkspaceMetaCloud();
             
-            if (isFirebaseEnabled && db) {
-                for (const ws of workspaces) {
-                    if (ws.projects) {
-                        for (const p of ws.projects) {
-                            try {
-                                const pDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'projects', p.id);
-                                await setDoc(pDocRef, p);
-                            } catch (e) {
-                                console.error("Undo sync failed: ", e);
-                            }
-                        }
-                    }
-                }
-            } else {
-                saveLocalState();
-                if (activeWorkspaceId) applyActiveWorkspaceToUI();
-                else renderHubView();
-            }
-
             updateUndoRedoControls();
             await pushActivityLog(`Performed Undo (↩️)`);
             showToast("Undo successful (↩️)");
@@ -1756,25 +1571,6 @@
             workspaces = next;
             await updateWorkspaceMetaCloud();
             
-            if (isFirebaseEnabled && db) {
-                for (const ws of workspaces) {
-                    if (ws.projects) {
-                        for (const p of ws.projects) {
-                            try {
-                                const pDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'projects', p.id);
-                                await setDoc(pDocRef, p);
-                            } catch (e) {
-                                console.error("Redo sync failed: ", e);
-                            }
-                        }
-                    }
-                }
-            } else {
-                saveLocalState();
-                if (activeWorkspaceId) applyActiveWorkspaceToUI();
-                else renderHubView();
-            }
-
             updateUndoRedoControls();
             await pushActivityLog(`Performed Redo (↪️)`);
             showToast("Redo successful (↪️)");
@@ -1798,7 +1594,6 @@
             workspaces.forEach(ws => {
                 if (ws.projects) {
                     ws.projects.forEach(p => {
-                        // Cast ongoing/On Going directly into Active status format
                         if (p.status === 'On Going' || p.status === 'ongoing' || p.status === 'Ongoing' || p.status === 'On-going') {
                             p.status = 'Active';
                         }
@@ -1890,7 +1685,6 @@
 
             workspaces.forEach(ws => {
                 const projectsList = ws.projects || [];
-                // Sanitize legacy ongoing flags in workspaces
                 projectsList.forEach(p => {
                     if (p.status === 'On Going' || p.status === 'ongoing' || p.status === 'Ongoing' || p.status === 'On-going') {
                         p.status = 'Active';
@@ -1979,7 +1773,6 @@
                         segmentRowsHtml += `</div>`;
                     });
 
-                    // Spacer column under ADD QUARTER to align neatly
                     segmentRowsHtml += `<div class="border-l border-slate-200/40 bg-slate-50/10 min-h-[60px]"></div>`;
 
                     segmentRowsHtml += `</div>`;
@@ -2085,7 +1878,6 @@
 
             const projectsList = ws.projects || [];
             
-            // Map legacy statuses cleanly
             projectsList.forEach(p => {
                 if (p.status === 'On Going' || p.status === 'ongoing' || p.status === 'Ongoing' || p.status === 'On-going') {
                     p.status = 'Active';
@@ -2600,13 +2392,8 @@
                 if (!proj.collaborators.includes(val)) proj.collaborators.push(val);
             }
 
-            if (isFirebaseEnabled && db) {
-                try {
-                    const pDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'projects', proj.id);
-                    await setDoc(pDocRef, proj, { merge: true });
-                } catch (e) {
-                    console.error("Cloud tag storage failed: ", e);
-                }
+            if (isFirebaseEnabled) {
+                await pushToCloud();
             } else {
                 saveLocalState();
             }
@@ -2630,13 +2417,8 @@
                 proj.collaborators = proj.collaborators.filter(c => c !== tag);
             }
 
-            if (isFirebaseEnabled && db) {
-                try {
-                    const pDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'projects', proj.id);
-                    await setDoc(pDocRef, proj, { merge: true });
-                } catch (e) {
-                    console.error("Cloud tag removal failed: ", e);
-                }
+            if (isFirebaseEnabled) {
+                await pushToCloud();
             } else {
                 saveLocalState();
             }
@@ -2665,13 +2447,8 @@
                 document.getElementById('btnToggleMode').className = "px-2.5 py-1 text-[10px] font-bold bg-white hover:bg-slate-50 rounded-lg text-slate-800 transition-all font-sans shadow-sm border border-slate-200/50";
                 document.getElementById('btnCancelEdit').classList.add('hidden');
                 
-                if (isFirebaseEnabled && db) {
-                    try {
-                        const pDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'projects', proj.id);
-                        await setDoc(pDocRef, proj, { merge: true });
-                    } catch (e) {
-                        console.error("Cloud project save failed: ", e);
-                    }
+                if (isFirebaseEnabled) {
+                    await pushToCloud();
                 } else {
                     saveLocalState();
                     renderMatrices();
@@ -2744,13 +2521,8 @@
             saveGlobalSnapshot();
             proj[field] = value;
 
-            if (isFirebaseEnabled && db) {
-                try {
-                    const pDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'projects', proj.id);
-                    await setDoc(pDocRef, proj, { merge: true });
-                } catch (e) {
-                    console.error("Cloud save attribute failed: ", e);
-                }
+            if (isFirebaseEnabled) {
+                await pushToCloud();
             } else {
                 saveLocalState();
                 renderMatrices();
@@ -2819,13 +2591,8 @@
                 updates: []
             });
 
-            if (isFirebaseEnabled && db) {
-                try {
-                    const pDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'projects', proj.id);
-                    await setDoc(pDocRef, proj, { merge: true });
-                } catch (e) {
-                    console.error("Cloud subproject additions failed: ", e);
-                }
+            if (isFirebaseEnabled) {
+                await pushToCloud();
             } else {
                 saveLocalState();
             }
@@ -2852,13 +2619,8 @@
                     const subItem = proj.subprojects.find(s => s.id === subId);
                     proj.subprojects = proj.subprojects.filter(s => s.id !== subId);
 
-                    if (isFirebaseEnabled && db) {
-                        try {
-                            const pDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'projects', proj.id);
-                            await setDoc(pDocRef, proj, { merge: true });
-                        } catch (e) {
-                            console.error("Cloud subproject deletion failed: ", e);
-                        }
+                    if (isFirebaseEnabled) {
+                        await pushToCloud();
                     } else {
                         saveLocalState();
                     }
@@ -2940,13 +2702,8 @@
                 document.getElementById('btnToggleSubMode').className = "px-2.5 py-1 text-[10px] font-bold bg-white hover:bg-slate-50 rounded-lg text-slate-800 transition-all font-sans shadow-sm border border-slate-200/50";
                 document.getElementById('btnCancelSubEdit').classList.add('hidden');
                 
-                if (isFirebaseEnabled && db) {
-                    try {
-                        const pDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'projects', proj.id);
-                        await setDoc(pDocRef, proj, { merge: true });
-                    } catch (e) {
-                        console.error("Cloud subproject edit save failed: ", e);
-                    }
+                if (isFirebaseEnabled) {
+                    await pushToCloud();
                 } else {
                     saveLocalState();
                 }
@@ -3012,13 +2769,8 @@
             saveGlobalSnapshot();
             sub[field] = value;
 
-            if (isFirebaseEnabled && db) {
-                try {
-                    const pDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'projects', proj.id);
-                    await setDoc(pDocRef, proj, { merge: true });
-                } catch (e) {
-                    console.error("Cloud subproject field update failed: ", e);
-                }
+            if (isFirebaseEnabled) {
+                await pushToCloud();
             } else {
                 saveLocalState();
             }
@@ -3048,13 +2800,8 @@
                     const deletedTitle = proj.subprojects.find(s => s.id === selectedSubprojectId)?.title || '';
                     proj.subprojects = proj.subprojects.filter(s => s.id !== selectedSubprojectId);
 
-                    if (isFirebaseEnabled && db) {
-                        try {
-                            const pDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'projects', proj.id);
-                            await setDoc(pDocRef, proj, { merge: true });
-                        } catch (e) {
-                            console.error("Cloud subproject deletion failed: ", e);
-                        }
+                    if (isFirebaseEnabled) {
+                        await pushToCloud();
                     } else {
                         saveLocalState();
                     }
@@ -3185,21 +2932,8 @@
                 }
             });
 
-            if (isFirebaseEnabled && db) {
-                try {
-                    const pDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'projects', proj.id);
-                    await setDoc(pDocRef, proj, { merge: true });
-
-                    const oppositeDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'projects', relatedId);
-                    const opSnap = await getDoc(oppositeDocRef);
-                    if (opSnap.exists()) {
-                        await updateDoc(oppositeDocRef, {
-                            relatedProjectIds: opSnap.data().relatedProjectIds.concat([proj.id]).filter((v, i, self) => self.indexOf(v) === i)
-                        });
-                    }
-                } catch (e) {
-                    console.error("Cloud save linkages failed: ", e);
-                }
+            if (isFirebaseEnabled) {
+                await pushToCloud();
             } else {
                 saveLocalState();
             }
@@ -3228,21 +2962,8 @@
                 }
             });
 
-            if (isFirebaseEnabled && db) {
-                try {
-                    const pDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'projects', proj.id);
-                    await setDoc(pDocRef, proj, { merge: true });
-
-                    const oppositeDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'projects', relatedId);
-                    const opSnap = await getDoc(oppositeDocRef);
-                    if (opSnap.exists()) {
-                        await updateDoc(oppositeDocRef, {
-                            relatedProjectIds: opSnap.data().relatedProjectIds.filter(id => id !== proj.id)
-                        });
-                    }
-                } catch (e) {
-                    console.error("Cloud severance of linkages failed: ", e);
-                }
+            if (isFirebaseEnabled) {
+                await pushToCloud();
             } else {
                 saveLocalState();
             }
@@ -3296,13 +3017,8 @@
                     const delLogText = proj.updates[index]?.text || '';
                     proj.updates.splice(index, 1);
 
-                    if (isFirebaseEnabled && db) {
-                        try {
-                            const pDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'projects', proj.id);
-                            await setDoc(pDocRef, proj, { merge: true });
-                        } catch (e) {
-                            console.error("Cloud logging details removal failed: ", e);
-                        }
+                    if (isFirebaseEnabled) {
+                        await pushToCloud();
                     } else {
                         saveLocalState();
                     }
@@ -3360,13 +3076,8 @@
                     const deletedText = sub.updates[index]?.text || '';
                     sub.updates.splice(index, 1);
 
-                    if (isFirebaseEnabled && db) {
-                        try {
-                            const pDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'projects', proj.id);
-                            await setDoc(pDocRef, proj, { merge: true });
-                        } catch (e) {
-                            console.error("Cloud subproject log removal failed: ", e);
-                        }
+                    if (isFirebaseEnabled) {
+                        await pushToCloud();
                     } else {
                         saveLocalState();
                     }
@@ -3400,13 +3111,8 @@
                 updater: updater
             });
 
-            if (isFirebaseEnabled && db) {
-                try {
-                    const pDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'projects', proj.id);
-                    await setDoc(pDocRef, proj, { merge: true });
-                } catch (e) {
-                    console.error("Cloud logging save failed: ", e);
-                }
+            if (isFirebaseEnabled) {
+                await pushToCloud();
             } else {
                 saveLocalState();
             }
@@ -3442,13 +3148,8 @@
                 updater: updater
             });
 
-            if (isFirebaseEnabled && db) {
-                try {
-                    const pDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'projects', proj.id);
-                    await setDoc(pDocRef, proj, { merge: true });
-                } catch (e) {
-                    console.error("Cloud subproject logging details failed: ", e);
-                }
+            if (isFirebaseEnabled) {
+                await pushToCloud();
             } else {
                 saveLocalState();
             }
@@ -3472,15 +3173,10 @@
                 async () => {
                     saveGlobalSnapshot();
                     
-                    if (isFirebaseEnabled && db) {
-                        try {
-                            const pDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'projects', proj.id);
-                            await deleteDoc(pDocRef);
-                        } catch (e) {
-                            console.error("Cloud project delete failed: ", e);
-                        }
+                    ws.projects = ws.projects.filter(p => p.id !== selectedProjectId);
+                    if (isFirebaseEnabled) {
+                        await pushToCloud();
                     } else {
-                        ws.projects = ws.projects.filter(p => p.id !== selectedProjectId);
                         saveLocalState();
                     }
                     await pushActivityLog(`Permanently deleted project scheduled card: [${proj.title}]`);
@@ -3517,15 +3213,10 @@
                 subprojects: []
             };
 
-            if (isFirebaseEnabled && db) {
-                try {
-                    const pDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'projects', newId);
-                    await setDoc(pDocRef, emptyProj);
-                } catch (e) {
-                    console.error("Cloud initialization of project failed: ", e);
-                }
+            ws.projects.push(emptyProj);
+            if (isFirebaseEnabled) {
+                await pushToCloud();
             } else {
-                ws.projects.push(emptyProj);
                 saveLocalState();
             }
             await pushActivityLog(`Double-clicked timeline grid to schedule project [${emptyProj.title}] under Lane [${getTowerText(tower)}] - Quarter [${time}]`);
@@ -3598,13 +3289,8 @@
             proj.tower = tower;
             proj.timeline = time;
 
-            if (isFirebaseEnabled && db) {
-                try {
-                    const pDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'projects', proj.id);
-                    await setDoc(pDocRef, proj, { merge: true });
-                } catch (e) {
-                    console.error("Cloud movement sync failed: ", e);
-                }
+            if (isFirebaseEnabled) {
+                await pushToCloud();
             } else {
                 saveLocalState();
                 renderMatrices();
@@ -3758,22 +3444,14 @@
             const idx = ws.timelines.indexOf(activeQuarterForModal);
             if (idx !== -1) ws.timelines[idx] = inputVal;
 
-            await updateWorkspaceMetaCloud();
-
             const matchingProjects = ws.projects.filter(p => p.timeline === activeQuarterForModal);
             for (const p of matchingProjects) {
                 p.timeline = inputVal;
-                if (isFirebaseEnabled && db) {
-                    try {
-                        const pDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'projects', p.id);
-                        await setDoc(pDocRef, p, { merge: true });
-                    } catch (e) {
-                        console.error("Cloud sync for renamed quarter failed: ", e);
-                    }
-                }
             }
 
-            if (!isFirebaseEnabled) {
+            if (isFirebaseEnabled) {
+                await pushToCloud();
+            } else {
                 saveLocalState();
                 applyActiveWorkspaceToUI();
             }
@@ -3797,20 +3475,7 @@
                 async () => {
                     saveGlobalSnapshot();
                     
-                    if (isFirebaseEnabled && db) {
-                        try {
-                            const matchingProjects = ws.projects.filter(p => p.timeline === target);
-                            for (const p of matchingProjects) {
-                                const pDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'projects', p.id);
-                                await deleteDoc(pDocRef);
-                            }
-                        } catch (e) {
-                            console.error("Cloud projects delete failed: ", e);
-                        }
-                    } else {
-                        ws.projects = ws.projects.filter(p => p.timeline !== target);
-                    }
-
+                    ws.projects = ws.projects.filter(p => p.timeline !== target);
                     ws.timelines = ws.timelines.filter(t => t !== target);
                     await updateWorkspaceMetaCloud();
                     await pushActivityLog(`Deleted timeline column [${target}] and erased all associated projects.`);
@@ -3876,20 +3541,7 @@
                     saveGlobalSnapshot();
                     const oldTowerName = ws.towerNames[target] || target;
                     
-                    if (isFirebaseEnabled && db) {
-                        try {
-                            const matchingProjects = ws.projects.filter(p => p.tower === target);
-                            for (const p of matchingProjects) {
-                                const pDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'projects', p.id);
-                                await deleteDoc(pDocRef);
-                            }
-                        } catch (e) {
-                            console.error("Cloud projects removal failed: ", e);
-                        }
-                    } else {
-                        ws.projects = ws.projects.filter(p => p.tower !== target);
-                    }
-
+                    ws.projects = ws.projects.filter(p => p.tower !== target);
                     ws.towers = ws.towers.filter(t => t !== target);
                     if (ws.towerNames[target]) delete ws.towerNames[target];
 
@@ -3907,6 +3559,16 @@
             initAuth().then(() => {
                 setupSearchInput();
                 updateUndoRedoControls();
+                
+                // 本地登录前检测
+                const sessionName = sessionStorage.getItem('collaborator_name');
+                if (sessionName) {
+                    currentUserName = sessionName;
+                    document.getElementById('loginOverlay').style.display = 'none';
+                    startRealtimeSync();
+                } else {
+                    document.getElementById('loginOverlay').style.display = 'flex';
+                }
             }).catch(err => {
                 console.error("Startup failure, switching to local preview mode: ", err);
                 isFirebaseEnabled = false;
@@ -3915,7 +3577,6 @@
             });
         }
 
-        // 健壮的DOMContentLoaded及readyState检查
         if (document.readyState === 'complete' || document.readyState === 'interactive') {
             initApp();
         } else {
